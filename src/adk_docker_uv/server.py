@@ -1,6 +1,5 @@
 """FastAPI server module."""
 
-import json
 import os
 from pathlib import Path
 
@@ -8,6 +7,8 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from google.adk.cli.fast_api import get_fast_api_app
+
+from adk_docker_uv.utils import parse_json_list_env
 
 # Load environment variables
 load_dotenv(override=True)
@@ -17,8 +18,9 @@ AGENT_DIR = str(Path(__file__).parent.parent)
 # Create FastAPI app at module level for uvicorn import
 AGENT_ENGINE_URI = os.getenv("AGENT_ENGINE_URI")
 ARTIFACT_SERVICE_URI = os.getenv("ARTIFACT_SERVICE_URI")
-ALLOWED_ORIGINS = json.loads(
-    os.getenv("ALLOWED_ORIGINS", '["http://localhost", "http://localhost:8000"]')
+ALLOWED_ORIGINS = parse_json_list_env(
+    env_key="ALLOWED_ORIGINS",
+    default='["http://localhost", "http://localhost:8000"]',
 )
 SERVE_WEB_INTERFACE = os.getenv("SERVE_WEB_INTERFACE", "false").lower() == "true"
 

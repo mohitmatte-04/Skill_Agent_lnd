@@ -40,6 +40,14 @@ docker compose up --build --watch
 
 ## What is this?
 
+A production-ready template for deploying Google ADK (Agent Development Kit) agents using containerization best practices. This project demonstrates how to build efficient, type-safe ADK agents with modern Python tooling.
+
+**Key features:**
+- **Optimized Docker builds**: Multi-stage builds with uv package manager (~200MB images, 5-10s rebuilds)
+- **Developer experience**: Hot reloading with Docker Compose watch mode for instant feedback
+- **Code quality**: Strict type checking (mypy), comprehensive testing (100% coverage), modern linting (ruff)
+- **Production ready**: Non-root containers, health checks, environment-based configuration
+
 ## Documentation
 
 - **[Development](docs/development.md)** - Code quality, testing, and dependencies

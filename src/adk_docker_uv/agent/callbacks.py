@@ -13,7 +13,6 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.adk.tools import ToolContext
 from google.adk.tools.base_tool import BaseTool
-from google.genai.types import Content
 
 logger = logging.getLogger(__name__)
 
@@ -26,17 +25,16 @@ async def add_session_to_memory(callback_context: CallbackContext) -> None:
 
     Args:
         callback_context: The callback context with access to invocation context
-
-    Returns:
-        None to proceed normally (or could return Content to short-circuit)
     """
     # TODO: use a public attribute (instead of _invocation_context) when available
     logger.debug("*** Started add_session_to_memory callback ***")
     if (
         hasattr(callback_context, "_invocation_context")
-        and callback_context._invocation_context
+        and callback_context._invocation_context  # pyright: ignore[reportPrivateUsage]
     ):
-        invocation_context = callback_context._invocation_context
+        invocation_context = (
+            callback_context._invocation_context  # pyright: ignore[reportPrivateUsage]
+        )
         if invocation_context.memory_service:
             logger.debug(
                 "Adding session to memory using "
@@ -60,8 +58,8 @@ class LoggingCallbacks:
     """Provides comprehensive logging callbacks for ADK agent lifecycle events.
 
     This class groups all agent lifecycle callback methods together and supports
-    logger injection following the project's strategy pattern. All callbacks
-    are designed to be non-intrusive (return None to proceed normally).
+    logger injection following the project's strategy pattern. All callbacks are
+    non-intrusive and return None.
 
     Attributes:
         logger: Logger instance for recording agent lifecycle events.
@@ -78,16 +76,12 @@ class LoggingCallbacks:
             logger = logging.getLogger(self.__class__.__module__)
         self.logger = logger
 
-    def before_agent(self, callback_context: CallbackContext) -> Content | None:
+    def before_agent(self, callback_context: CallbackContext) -> None:
         """Callback executed before agent processing begins.
 
         Args:
             callback_context (CallbackContext): Context containing agent name,
                 invocation ID, state, and user content.
-
-        Returns:
-            Content | None: Optional content to inject into the agent flow.
-                Returns None to proceed normally.
         """
         self.logger.info(
             f"*** Starting agent '{callback_context.agent_name}' "
@@ -101,16 +95,12 @@ class LoggingCallbacks:
 
         return None
 
-    def after_agent(self, callback_context: CallbackContext) -> Content | None:
+    def after_agent(self, callback_context: CallbackContext) -> None:
         """Callback executed after agent processing completes.
 
         Args:
             callback_context (CallbackContext): Context containing agent name,
                 invocation ID, state, and user content.
-
-        Returns:
-            Content | None: Optional content to inject into the agent flow.
-                Returns None to proceed normally.
         """
         self.logger.info(
             f"*** Leaving agent '{callback_context.agent_name}' "
@@ -128,7 +118,7 @@ class LoggingCallbacks:
         self,
         callback_context: CallbackContext,
         llm_request: LlmRequest,
-    ) -> LlmResponse | None:
+    ) -> None:
         """Callback executed before LLM model invocation.
 
         Args:
@@ -136,10 +126,6 @@ class LoggingCallbacks:
                 invocation ID, state, and user content.
             llm_request (LlmRequest): The request being sent to the LLM model
                 containing message contents.
-
-        Returns:
-            LlmResponse | None: Optional response to bypass model call.
-                Returns None to proceed with normal model invocation.
         """
         self.logger.info(
             f"*** Before LLM call for agent '{callback_context.agent_name}' "
@@ -163,17 +149,13 @@ class LoggingCallbacks:
         self,
         callback_context: CallbackContext,
         llm_response: LlmResponse,
-    ) -> LlmResponse | None:
+    ) -> None:
         """Callback executed after LLM model responds.
 
         Args:
             callback_context (CallbackContext): Context containing agent name,
                 invocation ID, state, and user content.
             llm_response (LlmResponse): The response received from the LLM model.
-
-        Returns:
-            LlmResponse | None: Optional modified response to override the original.
-                Returns None to use the original response.
         """
         self.logger.info(
             f"*** After LLM call for agent '{callback_context.agent_name}' "
@@ -196,7 +178,7 @@ class LoggingCallbacks:
         tool: BaseTool,
         args: dict[str, Any],
         tool_context: ToolContext,
-    ) -> dict[str, Any] | None:
+    ) -> None:
         """Callback executed before tool invocation.
 
         Args:
@@ -204,10 +186,6 @@ class LoggingCallbacks:
             args (dict[str, Any]): Arguments being passed to the tool.
             tool_context (ToolContext): Context containing agent name, invocation ID,
                 state, user content, and event actions.
-
-        Returns:
-            dict[str, Any] | None: Optional modified arguments to pass to the tool.
-                Returns None to use the original arguments.
         """
         self.logger.info(
             f"*** Before invoking tool '{tool.name}' in agent "
@@ -233,7 +211,7 @@ class LoggingCallbacks:
         args: dict[str, Any],
         tool_context: ToolContext,
         tool_response: dict[str, Any],
-    ) -> dict[str, Any] | None:
+    ) -> None:
         """Callback executed after tool invocation completes.
 
         Args:
@@ -242,10 +220,6 @@ class LoggingCallbacks:
             tool_context (ToolContext): Context containing agent name, invocation ID,
                 state, user content, and event actions.
             tool_response (dict[str, Any]): The response returned by the tool.
-
-        Returns:
-            dict[str, Any] | None: Optional modified response to override the original.
-                Returns None to use the original tool response.
         """
         self.logger.info(
             f"*** After invoking tool '{tool.name}' in agent "

@@ -98,9 +98,10 @@ root_agent (LlmAgent)
 **Key components:**
 - **agent.py**: LlmAgent configuration with callbacks
 - **tools.py**: Custom tools for the agent
-- **callbacks.py**: Lifecycle callbacks for logging and memory persistence
+- **callbacks.py**: Lifecycle callbacks for logging and memory persistence (all return `None`)
 - **prompt.py**: Agent instructions and descriptions
 - **server.py**: FastAPI server with ADK integration
+- **utils/env_parser.py**: Environment variable parsing utilities with validation
 
 ### FastAPI Server
 
@@ -177,6 +178,11 @@ See `docs/dockerfile-strategy.md` for detailed rationale.
 - Duck-typed mocks that satisfy ADK protocols
 - Async test support via pytest-asyncio
 
+**Test patterns:**
+- Use pytest's `capsys` fixture for capturing and validating stdout/stderr
+- Use `patch.dict(os.environ, ...)` for environment variable testing
+- Validate both success cases and error handling (invalid input, missing values, type mismatches)
+
 ## Environment Variables
 
 ### Required (choose ONE authentication method)
@@ -218,6 +224,8 @@ AGENT_ENGINE_URI=agentengine://projects/123/locations/us-central1/reasoningEngin
 ARTIFACT_SERVICE_URI=gs://your-artifact-storage-bucket
 
 # CORS allowed origins (JSON array string)
+# Parsed with validation and fallback to localhost defaults
+# Invalid JSON falls back to default with warning
 ALLOWED_ORIGINS='["https://your-domain.com", "http://localhost:3000"]'
 ```
 
@@ -276,7 +284,27 @@ The project uses callback pattern for cross-cutting concerns:
 - `LoggingCallbacks`: Lifecycle logging at all stages
 - `add_session_to_memory`: Automatic session persistence to memory service
 
-Callbacks return `None` to proceed normally or return content/response to short-circuit.
+All callbacks in this project return `None` and are non-intrusive (they only observe, not modify the agent flow).
+
+### Environment Variable Parsing
+
+Use `parse_json_list_env()` from `utils.env_parser` for safe JSON list parsing:
+
+```python
+from adk_docker_uv.utils import parse_json_list_env
+
+# Parses JSON array with validation and fallback
+origins = parse_json_list_env(
+    env_key="ALLOWED_ORIGINS",
+    default='["http://localhost"]',
+)
+```
+
+**Features:**
+- Validates both environment value and default are JSON arrays of strings
+- Falls back to default on invalid JSON with warning to stdout
+- Raises ValueError on invalid default (fail-fast at startup)
+- Type-safe return type (`list[str]`) using TypeGuard
 
 ### Docker Compose Development
 
@@ -287,6 +315,8 @@ Callbacks return `None` to proceed normally or return content/response to short-
 - GCP credentials: `/gcloud/application_default_credentials.json` (mounted from `~/.config/gcloud/`)
 
 **Note for Windows:** Update volume path in `docker-compose.yml` for GCP credentials (see comments in file).
+
+**Security:** The compose file binds to `127.0.0.1:8000` (localhost only) to prevent external network access. To allow access from other machines, change to `8000:8000`, but this is not recommended for development with sensitive data.
 
 ### Testing Registry Images
 

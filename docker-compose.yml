@@ -6,6 +6,8 @@ services:
     image: adk-docker-uv:latest
     container_name: adk-docker-uv
     ports:
+      # Bind to localhost only for security (prevents external network access)
+      # To allow access from other machines, change to "8000:8000" (not recommended for development with sensitive data)
       - "127.0.0.1:8000:8000"
     env_file:
       - .env

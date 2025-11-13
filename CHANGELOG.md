@@ -12,9 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Google ADK agent with Gemini model integration and FastAPI server
 - Dual authentication: Gemini Developer API or Vertex AI
-- Agent lifecycle callbacks for logging and memory persistence
-- Comprehensive unit tests with 100% coverage (37 tests)
-  - Reusable pytest fixtures in `conftest.py` for ADK mock objects
+- Agent lifecycle callbacks for logging and memory persistence (no short-circuits, all return None)
+- Comprehensive unit tests with 100% coverage
+- Environment variable parsing utility for safe JSON list handling with validation and fallback
 - Multi-stage Docker build with uv optimization (~200MB runtime image, 5-10s rebuilds)
 - Docker Compose with hot reloading (instant sync for code changes)
 - Code quality tooling: ruff, mypy (strict), pytest (100% coverage)

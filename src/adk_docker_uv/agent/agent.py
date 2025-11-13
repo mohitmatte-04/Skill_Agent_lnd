@@ -21,7 +21,6 @@ from adk_docker_uv.agent.tools import example_tool
 
 logging_callbacks = LoggingCallbacks()
 
-root_agent_tools: list = [PreloadMemoryTool()]
 root_agent = LlmAgent(
     name="example_agent",
     model=os.getenv("ROOT_AGENT_MODEL", "gemini-2.5-flash"),
