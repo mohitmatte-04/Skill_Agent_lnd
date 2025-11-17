@@ -2,12 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
 ### Added
+- Template initialization script (`init_template.py`) with dry-run mode.
+- Init script audit logs (`init_template_results.md`, `init_template_dry_run.md`) for change tracking
+- Template setup documentation in README.md and docs/development.md
 - InstructionProvider pattern for dynamic instruction generation (enables current dates, session-aware customization)
 - MockReadonlyContext fixture in conftest.py for InstructionProvider testing
 - Comprehensive prompt function tests (test_prompt.py, 13 tests)
