@@ -308,7 +308,15 @@ uv lock --upgrade-package package-name
 **Workflow behavior:**
 - **PR:** Build `pr-{number}-{sha}` image, run `terraform plan`, post comment
 - **Main:** Build `{sha}` + `latest` + `{version}` tags, run `terraform apply`, deploy to Cloud Run
+- **Tag push (`v*`):** Triggers CI/CD to build version-tagged Docker image (e.g., `v0.4.0`)
 - **Concurrency:** PRs cancel in-progress, main runs sequentially, per-workspace Terraform locking
+
+**Version tag trigger rationale:**
+- Tag creation happens after release PR is reviewed and merged (code already vetted)
+- Automatic workflow trigger ensures version-tagged images are built consistently
+- Tag is immutable pointer to already-reviewed code on main
+- Standard industry practice for automated release workflows
+- Security: Tags can only be pushed by authorized users, optional tag protection rules available
 
 **Authentication:** Workload Identity Federation (no service account keys). WIF configured by Terraform bootstrap.
 
@@ -448,6 +456,30 @@ Storage access is controlled by project-level IAM roles (e.g., `roles/storage.bu
 - `roles/storage.admin`: Manage GCS buckets and Terraform state
 
 **Documentation:** See `docs/terraform-infrastructure.md` section "IAM and Permissions Model" for security implications and cross-project configuration guidance.
+
+### Cloud Run Startup Probe Configuration
+
+**Critical insight - Startup probe must allow time for credential initialization:**
+
+The Cloud Run container needs time to initialize credentials before the artifact service can authenticate to GCS. Aggressive startup probes cause immediate deployment failure with no visibility into the root cause.
+
+**Correct configuration** (in `terraform/main/main.tf`):
+- `failure_threshold=5, period_seconds=20, timeout_seconds=15, initial_delay_seconds=20`
+- Uses HTTP health check at `/health` endpoint (not TCP socket)
+- Total window: 120 seconds to reach healthy state
+- Health endpoint returns `{"status": "ok"}` when server is ready
+
+**Why this matters:**
+- Overly aggressive config (e.g., `failure_threshold=1, period_seconds=180`) fails immediately
+- Symptom: Container exits with DEADLINE_EXCEEDED, logging unavailable (crashes before log initialization)
+- Root cause: Cloud Run metadata server credential setup takes ~30-60s, GCS auth fails before then
+- Image works locally because docker/docker-compose don't require Cloud Run credential initialization
+
+**Debugging approach:**
+1. If Cloud Run deployment fails silently, test locally with identical env vars: `docker compose up`
+2. Image working locally but failing in Cloud Run indicates credential/timing issue
+3. Cloud Run logs appear in Logging, but startup failures may have zero app-level logs
+4. Increase startup probe `initial_delay_seconds` and `failure_threshold` if credential setup takes longer
 
 ## Project-Specific Patterns
 
