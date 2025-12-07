@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an ADK (Agent Development Kit) application containerized with Docker and optimized with `uv` package manager. The project demonstrates best practices for deploying Google ADK agents in production using multi-stage Docker builds, hot reloading for local development, and strict code quality standards.
+This is a production-grade ADK (Agent Development Kit) application with enterprise infrastructure. The project demonstrates best practices for deploying Google ADK agents in production with automated CI/CD, managed state persistence, custom observability, and proven cloud infrastructure.
 
 **Key technologies:**
 - **Google ADK**: Agent framework for LLM-powered applications using Gemini models
@@ -20,6 +20,9 @@ This is an ADK (Agent Development Kit) application containerized with Docker and
 - **uv**: Modern Python package manager with PEP 735 dependency groups
 - **Docker**: Multi-stage builds with BuildKit cache optimization
 - **Python 3.13**: Modern syntax with strict type checking
+- **Terraform**: Infrastructure as Code for reproducible deployments
+- **Cloud Run**: Production hosting with regional redundancy and autoscaling
+- **OpenTelemetry**: Custom instrumentation with trace-log correlation
 
 ## Development Commands
 
@@ -87,7 +90,7 @@ uv run pytest tests/test_context.py::test_load_success -v   # Specific test
 
 ### ADK Agent Structure
 
-The agent is configured in `src/adk_docker_uv/agent.py`:
+The agent is configured in `src/agent_foundation/agent.py`:
 
 ```
 root_agent (LlmAgent)
@@ -107,9 +110,9 @@ root_agent (LlmAgent)
 
 ### FastAPI Server
 
-`src/adk_docker_uv/server.py`: ADK agent API endpoints (`get_fast_api_app()`), optional web UI (`SERVE_WEB_INTERFACE`), health check (`/health`), CORS for localhost.
+`src/agent_foundation/server.py`: ADK agent API endpoints (`get_fast_api_app()`), optional web UI (`SERVE_WEB_INTERFACE`), health check (`/health`), CORS for localhost.
 
-**Entry point:** `python -m adk_docker_uv.server`
+**Entry point:** `python -m agent_foundation.server`
 
 ### Multi-Stage Docker Build
 
@@ -224,7 +227,7 @@ See `docs/terraform-infrastructure.md`.
 
 ### Adding Custom Tools
 
-Create tools in `src/adk_docker_uv/tools.py` and register in `agent.py`:
+Create tools in `src/agent_foundation/tools.py` and register in `agent.py`:
 
 ```python
 from google.adk.tools import Tool
