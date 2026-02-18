@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Production-grade Google ADK agent with enterprise infrastructure: FastAPI, Terraform, Cloud Run, OpenTelemetry, Python 3.13.
+Guidance for AI agents. **CRITICAL: Update this file when establishing project patterns.**
 
 ## Critical
 
@@ -9,7 +9,7 @@ Production-grade Google ADK agent with enterprise infrastructure: FastAPI, Terra
 
 ## Template Initialization (One-Time)
 
-Base template repo. Run `uv run init_template.py --dry-run` (preview) or `uv run init_template.py` (apply). Script docstring contains complete usage/cleanup instructions. After use, suggest deleting `init_template.py`, `./.log/init_template_*.md`, README Bootstrap step 0, and this section from CLAUDE.md.
+Base template repo. Run `uv run init_template.py --dry-run` (preview) or `uv run init_template.py` (apply). Script docstring contains complete usage/cleanup instructions. After use, delete `init_template.py`, `./.log/init_template_*.md`, README Bootstrap step 0, and this Template Initialization section.
 
 ## Quick Commands
 
@@ -23,9 +23,9 @@ uv run pytest --cov --cov-report=term-missing  # Tests + 100% coverage required
 # Code quality (all required)
 uv run ruff format && uv run ruff check && uv run mypy
 
-# Terraform
-terraform -chdir=terraform/bootstrap init/plan/apply  # One-time CI/CD setup
-terraform -chdir=terraform/main init/plan/apply       # Deploy
+# Terraform (dev-only mode)
+terraform -chdir=terraform/bootstrap/dev init/plan/apply  # One-time CI/CD setup
+terraform -chdir=terraform/main init/plan/apply           # Deploy (TF_VAR_environment=dev)
 ```
 
 ## Architecture Overview
@@ -52,7 +52,9 @@ terraform -chdir=terraform/main init/plan/apply       # Deploy
 
 **Required:** GOOGLE_GENAI_USE_VERTEXAI=TRUE, GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION, AGENT_NAME, OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT (+ gcloud auth).
 
-**Key optional:** SERVE_WEB_INTERFACE, LOG_LEVEL (DEBUG/INFO/WARNING/ERROR/CRITICAL), TELEMETRY_NAMESPACE (default "local", auto-set to workspace in deployments), ROOT_AGENT_MODEL, AGENT_ENGINE, ARTIFACT_SERVICE_URI, ALLOW_ORIGINS (JSON array).
+**Key optional:** SERVE_WEB_INTERFACE, LOG_LEVEL (DEBUG/INFO/WARNING/ERROR/CRITICAL), TELEMETRY_NAMESPACE (default "local", auto-set to environment in deployments), ROOT_AGENT_MODEL, AGENT_ENGINE, ARTIFACT_SERVICE_URI, ALLOW_ORIGINS (JSON array).
+
+**CRITICAL:** Any new environment variable introduced to the codebase MUST be documented in `docs/environment-variables.md`. No exceptions. Include: purpose, default value, where to set, and whether required or optional.
 
 ## Code Quality
 
@@ -113,7 +115,9 @@ uv lock --upgrade               # Update all
 
 ## CI/CD & Deployment
 
-**Workflows:** ci-cd.yml (orchestrator), docker-build.yml, terraform-plan-apply.yml, code-quality.yml. PR: build `pr-{sha}`, plan, comment. Main: build `{sha}`+`latest`+`{version}`, deploy. Tag: version-tagged build. **Deploy by immutable digest** (not tag) to guarantee new Cloud Run revision.
+**Deployment Modes:** Dev-only (default, `production_mode: false` in ci-cd.yml config job) deploys to dev on merge. Production mode (`production_mode: true`) deploys dev+stage on merge, prod on git tag with approval gate. See [Infrastructure Guide](docs/infrastructure.md).
+
+**Workflows:** ci-cd.yml (orchestrator), config-summary.yml, docker-build.yml, metadata-extract.yml, pull-and-promote.yml, resolve-image-digest.yml, terraform-plan-apply.yml, code-quality.yml. PR: build `pr-{sha}`, dev-plan, comment. Main: build `{sha}`+`latest`, deploy dev (+ stage in prod mode). Tag: prod deploy (prod mode only). **Deploy by immutable digest** (not tag) to guarantee new Cloud Run revision.
 
 **Auth:** WIF (no SA keys). GitHub Variables auto-created: GCP_PROJECT_ID, GCP_LOCATION, IMAGE_NAME, GCP_WORKLOAD_IDENTITY_PROVIDER, ARTIFACT_REGISTRY_URI, ARTIFACT_REGISTRY_LOCATION, TERRAFORM_STATE_BUCKET.
 
@@ -121,17 +125,23 @@ uv lock --upgrade               # Update all
 
 ## Terraform
 
-**Two modules (use `-chdir` from repo root):**
+**Bootstrap Structure:** Each environment is a separate terraform root (`terraform/bootstrap/dev/`, `terraform/bootstrap/stage/`, `terraform/bootstrap/prod/`) calling shared modules (`terraform/bootstrap/module/gcp/` for GCP infrastructure, `terraform/bootstrap/module/github/` for GitHub automation). Each environment uses local state and terraform.tfvars for configuration. Creates: WIF, Artifact Registry, GCS state bucket, GitHub Environments, GitHub Environment Variables.
 
-1. **Bootstrap** (`terraform/bootstrap/`): One-time. WIF, Artifact Registry, GCS state bucket, GitHub Variables. Local state. Reads `.env` via dotenv (v1.2.9). Run locally.
+**Cross-Project IAM (Production Mode):** Stage and prod bootstrap roots grant cross-project Artifact Registry reader access for image promotion:
+- `stage/main.tf`: Grants stage's WIF principal `roles/artifactregistry.reader` on dev's registry (for stage-promote: dev → stage)
+- `prod/main.tf`: Grants prod's WIF principal `roles/artifactregistry.reader` on stage's registry (for prod-promote: stage → prod)
+- Narrow scope: read-only role, registry-resource-bound (not project-level)
+- Uses WIF principals (not service accounts): bypasses org policies restricting cross-project service account usage
+- Variables: `promotion_source_project` (source GCP project ID), `promotion_source_artifact_registry_name` (source registry name, e.g., `agent-name-dev`)
+- IAM binding: `google_artifact_registry_repository_iam_member` with `member = module.gcp.workload_identity_pool_principal_identifier`
 
-2. **Main** (`terraform/main/`): Cloud Run deployment. Service account, Vertex AI Reasoning Engine, GCS bucket, Cloud Run service. Remote state in GCS. Inputs via `TF_VAR_*`. Runs in GitHub Actions.
+**Main Module:** Cloud Run deployment (`terraform/main/`). Service account, Vertex AI Agent Engine, GCS bucket, Cloud Run service. Remote state in GCS. Inputs via `TF_VAR_*` from GitHub Environment variables. Runs in GitHub Actions. Requires `TF_VAR_environment` (dev/stage/prod) to set resource naming.
 
-**Naming:** Resources `${var.agent_name}-${terraform.workspace}`. Service account IDs truncate agent_name to 30 chars (GCP limit). Workspaces: bootstrap=`default`, main=`default`/`dev`/`stage`/`prod`. Cloud Run auto-sets `TELEMETRY_NAMESPACE=terraform.workspace`.
+**Naming:** Resources `${var.agent_name}-${var.environment}`. Service account IDs truncate agent_name to 30 chars (GCP limit). Cloud Run auto-sets `TELEMETRY_NAMESPACE=var.environment`.
 
-**Variable overrides:** GitHub Variables → `TF_VAR_*`. `coalesce()` skips empty/null. Overridable: log_level, serve_web_interface, allow_origins, root_agent_model, artifact_service_uri, agent_engine. `docker_image` nullable (defaults to previous for infra-only updates).
+**Runtime Variable Overrides:** GitHub Environment Variables → `TF_VAR_*`. `coalesce()` skips empty/null. Overridable runtime config: log_level, serve_web_interface, root_agent_model, otel_instrumentation_genai_capture_message_content, adk_suppress_experimental_feature_warnings. `docker_image` nullable (defaults to previous for infra-only updates). **Infrastructure resources (AGENT_ENGINE, ARTIFACT_SERVICE_URI, CORS origins) are hard-coded in Terraform** (no variable overrides).
 
-**IAM:** Dedicated GCP project per env. Project-level roles same-project only. Cross-project buckets need external IAM + `ARTIFACT_SERVICE_URI`. App SA roles in terraform/main/main.tf. WIF roles in terraform/bootstrap/main.tf.
+**IAM:** Dedicated GCP project per env. Project-level WIF roles same-project only (in terraform/bootstrap/module/gcp/main.tf). Cross-project Artifact Registry IAM grants in environment bootstrap roots (stage/main.tf, prod/main.tf) for image promotion. App SA roles in terraform/main/main.tf.
 
 **Cloud Run probe:** Config failure_threshold=5, period_seconds=20, initial_delay_seconds=20, timeout_seconds=15 (total 120s). Allow credential init (~30-60s). Debug: local works but Cloud Run fails = credential/timing issue.
 
@@ -147,10 +157,26 @@ uv lock --upgrade               # Update all
 
 **Docker Compose:** Volumes: `/app/src` (synced), `/app/data` (read-only), `/gcloud/application_default_credentials.json` (from `~/.config/gcloud/`). Windows: update GCP creds path. Binds `127.0.0.1:8000`.
 
-**Test Registry Image:** `gcloud auth configure-docker` → pull → `docker compose -f docker-compose.yml -f docker-compose.registry.yml up`. Container suffix `-registry`.
+**Test Deployed:** `gcloud run services proxy <service-name> --project <project> --region <region> --port 8000`. Service name: `${agent_name}-${environment}` (e.g., `my-agent-dev`).
 
-**Test Deployed:** `gcloud run services proxy <service-name> --project <project> --region <region> --port 8000`. Service name: `${agent_name}-${workspace}`.
+## Documentation Strategy
+
+**CRITICAL:** Task-based organization (match developer mental model), not technical boundaries.
+
+**Structure:**
+- **README.md:** ~200 lines max. Quick start only. Points to docs/.
+- **docs/*.md:** ~300 lines max. Action paths ("I want to..."). Core guides: getting-started, development, infrastructure, environment-variables, observability, troubleshooting, template-management.
+- **docs/references/*.md:** No limit. Deep-dive technical docs. Optional follow-up.
+
+**Rules:**
+- Task-based, not tech-based (e.g., "Infrastructure" not "Terraform" + "CI/CD" separately)
+- Hub-and-spoke navigation: docs/README.md and docs/references/README.md are navigation indexes
+- Inline cross-links only when critically contextual (hybrid approach)
+- No "See Also" sections - rely on index navigation instead
+- Single source of truth: env vars only in docs/environment-variables.md
+- Update docs/README.md when adding docs
+- Keep guides digestible (<300 lines). Move details to references/.
 
 ## Documentation References
 
-Base infra docs: `docs/base-infra/`. Key files: bootstrap-setup.md, environment-variables.md, development.md, cicd-setup.md, docker-compose-workflow.md, dockerfile-strategy.md, terraform-infrastructure.md, validating-multiplatform-builds.md.
+Task-based docs in `docs/`. Core: getting-started.md, development.md, infrastructure.md, environment-variables.md. Operations: observability.md, troubleshooting.md. Template: template-management.md. Detailed references: docs/references/ (bootstrap.md, protection-strategies.md, deployment.md, cicd.md, testing.md, code-quality.md, docker-compose-workflow.md, dockerfile-strategy.md).
