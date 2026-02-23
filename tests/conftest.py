@@ -16,7 +16,7 @@ def pytest_configure(config: pytest.Config) -> None:
     including pytest-mock. We must use unittest.mock.patch here because:
 
     1. This hook runs before test collection
-    2. Test collection imports test modules, which imports agent_foundation modules
+    2. Test collection imports test modules, which imports skill_agent_lnd modules
     3. Agent modules may trigger API calls during import (auth, config loading)
     4. pytest-mock's mocker/session_mocker fixtures aren't available until AFTER
        test collection completes
@@ -459,7 +459,7 @@ def mock_load_dotenv(mocker: MockerFixture) -> MockType:
     Returns:
         Mock object for load_dotenv function.
     """
-    return mocker.patch("agent_foundation.utils.config.load_dotenv")
+    return mocker.patch("skill_agent_lnd.utils.config.load_dotenv")
 
 
 @pytest.fixture

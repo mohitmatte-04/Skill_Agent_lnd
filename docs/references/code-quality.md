@@ -156,7 +156,7 @@ From `pyproject.toml`:
 [tool.mypy]
 python_version = "3.13"
 mypy_path = "src"
-packages = ["agent_foundation"]
+packages = ["skill_agent_lnd"]
 
 # Completeness checks
 disallow_untyped_defs = true         # All functions must have type hints
@@ -301,19 +301,19 @@ From `pyproject.toml`:
 [tool.coverage.run]
 omit = [
     # __init__.py files: namespace marker, no logic
-    "src/agent_foundation/**/__init__.py",
+    "src/skill_agent_lnd/**/__init__.py",
 
     # server.py: FastAPI setup and ADK initialization (integration tested via CI/CD)
-    "src/agent_foundation/server.py",
+    "src/skill_agent_lnd/server.py",
 
     # agent.py: LlmAgent instantiation (tested through callbacks, not in isolation)
-    "src/agent_foundation/**/agent.py",
+    "src/skill_agent_lnd/**/agent.py",
 
     # prompt.py: Prompt text and formatting (integration tested via agent runs)
-    "src/agent_foundation/**/prompt.py",
+    "src/skill_agent_lnd/**/prompt.py",
 
     # observability.py: OpenTelemetry setup (infrastructure initialization)
-    "src/agent_foundation/utils/observability.py",
+    "src/skill_agent_lnd/utils/observability.py",
 ]
 ```
 
@@ -330,7 +330,7 @@ omit = [
 
 **Real example from our codebase:**
 ```python
-# src/agent_foundation/utils/config.py:234
+# src/skill_agent_lnd/utils/config.py:234
 if not isinstance(result, list):  # pragma: no cover
     # Pydantic validation makes this unreachable
     msg = "Invalid allow_origins format"

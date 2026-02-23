@@ -1,27 +1,27 @@
 [project]
-name = "agent-foundation"
-version = "0.9.2"
+name = "skill-agent-lnd"
+version = "0.1.0"
 description = "Opinionated, production-ready LLM Agent deployment with enterprise-grade infrastructure"
 readme = "README.md"
-authors = [
-    { name = "doug", email = "110487462+doughayden@users.noreply.github.com" }
-]
 requires-python = ">=3.13,<3.14"
 dependencies = [
     # Pin ADK to test releases before locking upgrades
     "google-adk==1.25.1",
     "google-auth>=2.40.3,<3.0.0",
+    "google-cloud-bigquery>=3.38.0",
     "google-cloud-logging>=3.12.1,<4.0.0",
+    "numpy>=2.3.5",
     "opentelemetry-exporter-gcp-logging>=1.9.0a0,<2.0.0",
     "opentelemetry-exporter-otlp-proto-grpc==1.37.0",
     "opentelemetry-instrumentation-google-genai>=0.4b0,<0.5",
     "opentelemetry-instrumentation-logging>=0.58b0,<0.59",
+    "pandas>=3.0.0",
     "pydantic>=2.11.0,<3.0.0",
     "python-dotenv>=1.0.0,<2.0.0",
 ]
 
 [project.scripts]
-server = "agent_foundation.server:main"
+server = "skill_agent_lnd.server:main"
 
 [dependency-groups]
 dev = [
@@ -77,7 +77,7 @@ select = [
 [tool.mypy]
 python_version = "3.13"
 mypy_path = "src"
-packages = ["agent_foundation"]
+packages = ["skill_agent_lnd"]
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -102,15 +102,15 @@ source = ["src"]
 branch = true
 omit = [
     # __init__.py files: namespace marker, no logic
-    "src/agent_foundation/**/__init__.py",
+    "src/skill_agent_lnd/**/__init__.py",
     # server.py: FastAPI setup and ADK initialization (integration tested via CI/CD)
-    "src/agent_foundation/server.py",
+    "src/skill_agent_lnd/server.py",
     # agent.py: LlmAgent instantiation (tested through callbacks, not in isolation)
-    "src/agent_foundation/**/agent.py",
+    "src/skill_agent_lnd/**/agent.py",
     # prompt.py: Prompt text and formatting (integration tested via agent runs)
-    "src/agent_foundation/**/prompt.py",
+    "src/skill_agent_lnd/**/prompt.py",
     # observability.py: OpenTelemetry setup (infrastructure initialization)
-    "src/agent_foundation/utils/observability.py",
+    "src/skill_agent_lnd/utils/observability.py",
 ]
 
 [tool.coverage.report]

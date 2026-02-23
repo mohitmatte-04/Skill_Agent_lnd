@@ -120,12 +120,14 @@ def setup_opentelemetry(
     try:
         credentials, _ = google.auth.default()
     except DefaultCredentialsError as e:
-        print(f"❌ [observability] Error getting Application Default Credentials: {e}")
-        print("💻 Try authenticating with 'gcloud auth application-default login'")
-        raise e
+        print(f"⚠️ [observability] ADC not found: {e}")
+        print("💻 Telemetry will be disabled. To enable, run 'gcloud auth application-default login'")
+        # Return early to skip telemetry setup
+        return
     except Exception as e:
-        print(f"❌ [observability] Unexpected error during authentication: {e}")
-        raise e
+        print(f"⚠️ [observability] Unexpected error during authentication: {e}")
+        # Return early to skip telemetry setup
+        return
 
     # Type narrowing: Validate quota project support (required for Cloud Logging client)
     if not hasattr(credentials, "with_quota_project"):

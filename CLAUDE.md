@@ -7,10 +7,6 @@ Guidance for AI agents. **CRITICAL: Update this file when establishing project p
 - **Never commit to main** (branch protection enforced). Workflow: feature branch → PR → merge.
 - **Version bumps:** Update `pyproject.toml` → `uv lock` (both files together required for CI `--locked` to pass).
 
-## Template Initialization (One-Time)
-
-Base template repo. Run `uv run init_template.py --dry-run` (preview) or `uv run init_template.py` (apply). Script docstring contains complete usage/cleanup instructions. After use, delete `init_template.py`, `./.log/init_template_*.md`, README Bootstrap step 0, and this Template Initialization section.
-
 ## Quick Commands
 
 ```bash
@@ -30,12 +26,12 @@ terraform -chdir=terraform/main init/plan/apply           # Deploy (TF_VAR_envir
 
 ## Architecture Overview
 
-**ADK App Structure** (`src/agent_foundation/agent.py`):
+**ADK App Structure** (`src/skill_agent_lnd/agent.py`):
 - `GlobalInstructionPlugin`: Dynamic instruction generation (InstructionProvider pattern)
 - `LoggingPlugin`: Agent lifecycle logging
 - `root_agent` (LlmAgent): gemini-2.5-flash (configurable `ROOT_AGENT_MODEL`), custom tools, callbacks
 
-**Package exports** (`src/agent_foundation/__init__.py`): Uses PEP 562 `__getattr__` for explicit lazy loading. Declares `agent` in `__all__` but defers import until first access. Supports both ADK eval CLI and web server workflows while ensuring .env loads before agent.py executes module-level code.
+**Package exports** (`src/skill_agent_lnd/__init__.py`): Uses PEP 562 `__getattr__` for explicit lazy loading. Declares `agent` in `__all__` but defers import until first access. Supports both ADK eval CLI and web server workflows while ensuring .env loads before agent.py executes module-level code.
 
 **Key modules:**
 - `agent.py`: App/LlmAgent config
@@ -160,7 +156,7 @@ uv lock --upgrade               # Update all
 
 ## Project-Specific Patterns
 
-**Custom Tools:** Create in `src/agent_foundation/tools.py`, register in `agent.py`. Tool(name, description, func).
+**Custom Tools:** Create in `src/skill_agent_lnd/tools.py`, register in `agent.py`. Tool(name, description, func).
 
 **Callbacks:** `LoggingCallbacks` (lifecycle), `add_session_to_memory` (session persist). All return `None` (observe-only).
 

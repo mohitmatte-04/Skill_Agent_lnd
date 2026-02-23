@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from agent_foundation.callbacks import add_session_to_memory
+from skill_agent_lnd.callbacks import add_session_to_memory
 
 
 class TestAddSessionToMemory:

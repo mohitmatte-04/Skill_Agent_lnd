@@ -7,7 +7,7 @@ implementation choices (plugins, tools, etc.).
 Future: Container-based smoke tests for CI/CD will be added here.
 """
 
-from agent_foundation.agent import app
+from skill_agent_lnd.agent import app
 
 
 class TestAppIntegration:
