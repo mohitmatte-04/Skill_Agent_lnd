@@ -47,6 +47,7 @@ module "github_protected" {
 
 # Cross-project binding to allow docker image promotion
 resource "google_artifact_registry_repository_iam_member" "promotion_source" {
+  count      = var.promotion_source_project != null && var.promotion_source_artifact_registry_name != null ? 1 : 0
   project    = var.promotion_source_project
   repository = var.promotion_source_artifact_registry_name
   role       = "roles/artifactregistry.reader"
@@ -60,7 +61,7 @@ data "github_repository" "repo" {
 
 resource "github_repository_ruleset" "production_tags" {
   name        = "Production Release Tag Protection"
-  repository  = data.github_repository.repo.name
+  repository  = var.repository_name
   target      = "tag"
   enforcement = "active"
 
