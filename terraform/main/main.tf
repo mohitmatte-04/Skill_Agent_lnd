@@ -86,13 +86,17 @@ resource "random_id" "bucket_suffix" {
 
 resource "google_storage_bucket" "artifact_service" {
   name     = "${local.resource_name}-artifact-service-${random_id.bucket_suffix.hex}"
-  location = "US"
+  location = var.location
 
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
 
   versioning {
     enabled = true
+  }
+
+  soft_delete_policy {
+    retention_duration_seconds = 0
   }
 }
 
