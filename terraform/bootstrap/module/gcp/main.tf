@@ -20,6 +20,10 @@ locals {
     "roles/serviceusage.serviceUsageConsumer",
     "roles/storage.admin",
   ])
+
+  github_repo_id = data.github_repository.agent.repo_id != null ? tostring(data.github_repository.agent.repo_id) : "0"
+  # Support names with underscores/uppercase by converting to lowercase-dash
+  agent_name_id  = lower(replace(var.agent_name, "_", "-"))
 }
 
 resource "google_project_service" "main" {
@@ -35,17 +39,17 @@ data "github_repository" "agent" {
 
 resource "google_iam_workload_identity_pool" "github" {
   project                   = var.project
-  workload_identity_pool_id = substr("gh-actions-${var.environment}-${data.github_repository.agent.repo_id}", 0, 32)
+  workload_identity_pool_id = substr("gh-actions-${var.environment}-${local.github_repo_id}", 0, 32)
   display_name              = "GitHub Actions (${var.environment})"
-  description               = "GitHub Actions - environment: ${var.environment}, repository: ${var.repository_owner}/${var.repository_name}, repo ID: ${data.github_repository.agent.repo_id}"
+  description               = "GitHub Actions - environment: ${var.environment}, repository: ${var.repository_owner}/${var.repository_name}, repo ID: ${local.github_repo_id}"
 }
 
 resource "google_iam_workload_identity_pool_provider" "github" {
   project                            = var.project
-  workload_identity_pool_provider_id = substr("gh-oidc-${var.environment}-${data.github_repository.agent.repo_id}", 0, 32)
+  workload_identity_pool_provider_id = substr("gh-oidc-${var.environment}-${local.github_repo_id}", 0, 32)
   workload_identity_pool_id          = google_iam_workload_identity_pool.github.workload_identity_pool_id
   display_name                       = "GitHub OIDC (${var.environment})"
-  description                        = "GitHub OIDC - environment: ${var.environment}, repository: ${var.repository_owner}/${var.repository_name}, repo ID: ${data.github_repository.agent.repo_id}"
+  description                        = "GitHub OIDC - environment: ${var.environment}, repository: ${var.repository_owner}/${var.repository_name}, repo ID: ${local.github_repo_id}"
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"
   }
@@ -72,8 +76,8 @@ resource "random_id" "bucket_suffix" {
 
 resource "google_storage_bucket" "terraform_state" {
   project  = var.project
-  name     = "terraform-state-${var.agent_name}-${var.environment}-${random_id.bucket_suffix.hex}"
-  location = "US"
+  name     = "terraform-state-${local.agent_name_id}-${var.environment}-${random_id.bucket_suffix.hex}"
+  location = var.location
 
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
@@ -81,11 +85,15 @@ resource "google_storage_bucket" "terraform_state" {
   versioning {
     enabled = true
   }
+
+  soft_delete_policy {
+    retention_duration_seconds = 0
+  }
 }
 
 resource "google_artifact_registry_repository" "docker" {
   project                = var.project
-  repository_id          = "${var.agent_name}-${var.environment}"
+  repository_id          = "${local.agent_name_id}-${var.environment}"
   format                 = "DOCKER"
   description            = "Docker repository for ${var.agent_name} (${var.environment})"
   cleanup_policy_dry_run = false
