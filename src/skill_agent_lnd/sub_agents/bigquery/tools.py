@@ -17,28 +17,29 @@
 import datetime
 import logging
 import os
+from typing import Any
 
 import numpy as np
 import pandas as pd
-from ...utils.utils import get_env_var, USER_AGENT
 from google.adk.tools import ToolContext
 from google.adk.tools.bigquery.client import get_bigquery_client
 from google.cloud import bigquery
 from google.genai import Client
 from google.genai.types import HttpOptions
 
-from ...utils.utils import USER_AGENT
+from ...utils.utils import USER_AGENT, get_env_var
 
 logger = logging.getLogger(__name__)
 
 # Try to import chase_sql, but don't fail if it's not available
 try:
     from .chase_sql import chase_constants
+
     CHASE_SQL_AVAILABLE = True
 except ImportError:
     logger.warning("chase_sql module not available - CHASE NL2SQL method will not work")
     CHASE_SQL_AVAILABLE = False
-    chase_constants = None
+    chase_constants = None  # type: ignore
 
 # Assume that `BQ_COMPUTE_PROJECT_ID` and `BQ_DATA_PROJECT_ID` are set in the
 # environment. See the `data_agent` README for more details.
@@ -60,7 +61,7 @@ logger.info("created llm client")
 MAX_NUM_ROWS = 10000
 
 
-def _serialize_value_for_sql(value):
+def _serialize_value_for_sql(value: Any) -> str:
     """Serializes a Python value from a pandas DataFrame into a BigQuery SQL literal."""
     if isinstance(value, (list, np.ndarray)):
         # Format arrays.
@@ -89,10 +90,10 @@ def _serialize_value_for_sql(value):
     return str(value)
 
 
-database_settings = None
+database_settings: dict[str, Any] | None = None
 
 
-def get_database_settings():
+def get_database_settings() -> dict[str, Any]:
     """Get database settings."""
     global database_settings
     if database_settings is None:
@@ -100,26 +101,27 @@ def get_database_settings():
     return database_settings
 
 
-def update_database_settings():
+def update_database_settings() -> dict[str, Any]:
     """Update database settings."""
     global database_settings
     schema = get_bigquery_schema_and_samples()
-    database_settings = {
+    new_settings = {
         "data_project_id": get_env_var("BQ_DATA_PROJECT_ID"),
         "dataset_id": get_env_var("BQ_DATASET_ID"),
         "schema": schema,
     }
     # Include ChaseSQL-specific constants only if available.
     if CHASE_SQL_AVAILABLE and chase_constants:
-        database_settings.update(chase_constants.chase_sql_constants_dict)
+        new_settings.update(chase_constants.chase_sql_constants_dict)
+    database_settings = new_settings
     return database_settings
 
 
-def get_bigquery_schema_and_samples():
+def get_bigquery_schema_and_samples() -> dict[str, Any]:
     """Retrieves schema and sample values for the BigQuery dataset tables."""
     client = get_bigquery_client(
         project=compute_project,
-        credentials=None,
+        credentials=None,  # type: ignore
     )
     dataset_ref = bigquery.DatasetReference(data_project, dataset_id)
     tables_context = {}
@@ -132,16 +134,7 @@ def get_bigquery_schema_and_samples():
             for schema_field in table_info.schema
         ]
         table_ref = dataset_ref.table(table.table_id)
-        sample_values = []
-        if False:
-            sample_query = f"SELECT * FROM `{table_ref}` LIMIT 5"
-            sample_values = (
-                client.query(sample_query).to_dataframe().to_dict(orient="list")
-            )
-            for key in sample_values:
-                sample_values[key] = [
-                    _serialize_value_for_sql(v) for v in sample_values[key]
-                ]
+        sample_values: dict[str, Any] | list[Any] = []
         tables_context[str(table_ref)] = {
             "table_schema": table_schema,
             "example_values": sample_values,
@@ -230,7 +223,7 @@ best practices outlined above to generate the correct BigQuery SQL.
         config={"temperature": 0.1},
     )
 
-    sql = response.text
+    sql = response.text or ""
     if sql:
         sql = sql.replace("```sql", "").replace("```", "").strip()
 

@@ -15,7 +15,7 @@
 """Translator from SQLite to BigQuery."""
 
 import re
-from typing import Any, Final
+from typing import Any, Final, cast
 
 import regex
 import sqlglot
@@ -26,11 +26,10 @@ from .correction_prompt_template import (
     CORRECTION_PROMPT_TEMPLATE_V1_0,
 )  # pylint: disable=g-importing-member
 
-
 ColumnSchemaType = tuple[str, str]
 AllColumnsSchemaType = list[ColumnSchemaType]
-TableSchemaType = tuple[str, AllColumnsSchemaType]
-DDLSchemaType = list[TableSchemaType]
+TableSchemaType = tuple[str | None, AllColumnsSchemaType | None]
+DDLSchemaType = list[tuple[str, AllColumnsSchemaType]]
 
 SQLGlotColumnsDictType = dict[str, str]
 SQLGlotSchemaType = dict[str, Any]
@@ -42,8 +41,8 @@ def _isinstance_list_of_str_tuples_lists(obj: Any) -> bool:
     """Checks if the object is a list of tuples or listsof strings."""
     return (
         isinstance(obj, list)
-        and all([isinstance(v, (tuple, list)) for v in obj])
-        and all([isinstance(v[0], str) and isinstance(v[1], str) for v in obj])
+        and all(isinstance(v, (tuple, list)) for v in obj)
+        and all(isinstance(v[0], str) and isinstance(v[1], str) for v in obj)
     )
 
 
@@ -54,17 +53,20 @@ def _isinstance_ddl_schema_type(obj: Any) -> bool:
         isinstance(obj, list)
         and all(
             # Every element is a tuple or list.
-            [isinstance(v, (tuple, list)) for v in obj]
+            isinstance(v, (tuple, list))
+            for v in obj
         )
         and all(
             # First element is a string (table name) and
             # second element is a list (of tuples or lists).
-            [isinstance(v[0], str) and isinstance(v[1], list) for v in obj]
+            isinstance(v[0], str) and isinstance(v[1], list)
+            for v in obj
         )
         and all(
             # Every element of above list is a tuple or list of strings
             # (column name, column type)
-            [_isinstance_list_of_str_tuples_lists(v[1]) for v in obj]
+            _isinstance_list_of_str_tuples_lists(v[1])
+            for v in obj
         )
     )
     # pylint: enable=g-complex-comprehension
@@ -75,9 +77,9 @@ def _isinstance_sqlglot_schema_type(obj: Any) -> bool:
     # pylint: disable=g-complex-comprehension
     return (
         isinstance(obj, dict)
-        and all([isinstance(v, dict) for v in obj.values()])
-        and all([isinstance(c, str) for d in obj.values() for c, _ in d.items()])
-        and all([isinstance(t, str) for d in obj.values() for _, t in d.items()])
+        and all(isinstance(v, dict) for v in obj.values())
+        and all(isinstance(c, str) for d in obj.values() for c, _ in d.items())
+        and all(isinstance(t, str) for d in obj.values() for _, t in d.items())
     )
     # pylint: enable=g-complex-comprehension
 
@@ -138,13 +140,13 @@ class SqlTranslator:
             self._model = model
 
     @classmethod
-    def _parse_response(cls, text: str) -> str | None:
+    def _parse_response(cls, text: str) -> str:
         """Extracts the SQL query from the response text."""
         pattern = r"```sql(.*?)```"
         match = re.search(pattern, text, re.DOTALL)
         if match:
             return match.group(1).strip()
-        return None
+        return text.strip()
 
     @classmethod
     def _apply_heuristics(cls, sql_query: str) -> str:
@@ -205,7 +207,7 @@ class SqlTranslator:
         """Extracts the schema from multiple DDL statements."""
         ddl_statements = ddls.split(";\n")
         ddl_statements = [ddl.strip() for ddl in ddl_statements if ddl.strip()]
-        schema = []
+        schema: DDLSchemaType = []
         for ddl_statement in ddl_statements:
             if ddl_statement:
                 ddl_statement = ddl_statement.strip() + ";"  # Add the semicolon back.
@@ -235,11 +237,16 @@ class SqlTranslator:
         column_names = sample["db_column_names"]["column_name"][1:]
         column_types = sample["db_column_types"][1:]
         column_types = [col_types_map[col_type] for col_type in column_types]
-        assert len(column_names) == len(column_types)
-        cols_and_types: list[tuple[str, str]] = list(zip(column_names, column_types))
+        if len(column_names) != len(column_types):
+            raise ValueError(
+                f"Column names and types length mismatch: {len(column_names)} != {len(column_types)}"
+            )
+        cols_and_types: list[tuple[str, str]] = list(
+            zip(column_names, column_types, strict=True)
+        )
         tables_to_columns: dict[str, dict[str, str]] = {}
         for id_pos, table_id in enumerate(table_ids):
-            if tables[table_id] in tables_to_columns.keys():
+            if tables[table_id] in tables_to_columns:
                 tables_to_columns[tables[table_id]].update(
                     dict([cols_and_types[id_pos]])
                 )
@@ -252,24 +259,24 @@ class SqlTranslator:
         """Returns the table parts from the table name."""
         table_parts = table_name.split(".")
         if len(table_parts) == 3:
-            return table_parts
+            return (table_parts[0], table_parts[1], table_parts[2])
         elif len(table_parts) == 2:
-            return None, *table_parts
+            return (None, table_parts[0], table_parts[1])
         elif len(table_parts) == 1:
-            return None, None, *table_parts
+            return (None, None, table_parts[0])
         else:
             raise ValueError(f"Invalid table name: {table_name}")
 
     @classmethod
     def format_schema(cls, schema: DDLSchemaType) -> SQLGlotSchemaType:
         """Formats the DDL schema for use in SQLGlot."""
-        schema_dict = {}
+        schema_dict: SQLGlotSchemaType = {}
         catalog, db = None, None
         for table_name, columns in schema:
-            catalog, db, table_name = cls._get_table_parts(table_name)
-            schema_dict[table_name] = {}
+            catalog, db, table_name_only = cls._get_table_parts(table_name)
+            schema_dict[table_name_only] = {}
             for column_name, column_type in columns:
-                schema_dict[table_name][column_name] = column_type
+                schema_dict[table_name_only][column_name] = column_type
         if db:
             schema_dict = {db: schema_dict}
         if catalog:
@@ -278,20 +285,22 @@ class SqlTranslator:
 
     @classmethod
     def rewrite_schema_for_sqlglot(
-        cls, schema: str | SQLGlotSchemaType | BirdSampleType
-    ) -> SQLGlotSchemaType:
+        cls, schema: str | SQLGlotSchemaType | BirdSampleType | DDLSchemaType | None
+    ) -> SQLGlotSchemaType | None:
         """Rewrites the schema for use in SQLGlot."""
         schema_dict = None
         if schema:
             if isinstance(schema, str):
-                schema = cls.extract_schema_from_ddls(schema)
-                schema_dict = cls.format_schema(schema)
+                ddl_schema = cls.extract_schema_from_ddls(schema)
+                schema_dict = cls.format_schema(ddl_schema)
             elif _isinstance_sqlglot_schema_type(schema):
-                schema_dict = schema
+                schema_dict = cast(SQLGlotSchemaType, schema)
             elif _isinstance_bird_sample_type(schema):
-                schema_dict = cls._get_schema_from_bird_sample(schema)
+                schema_dict = cls._get_schema_from_bird_sample(
+                    cast(BirdSampleType, schema)
+                )
             elif _isinstance_ddl_schema_type(schema):
-                schema_dict = cls.format_schema(schema)
+                schema_dict = cls.format_schema(cast(DDLSchemaType, schema))
             else:
                 raise TypeError(f"Unsupported schema type: {type(schema)}")
         return schema_dict
@@ -385,7 +394,7 @@ class SqlTranslator:
             schema_dict=schema_dict,
         )
         errors, sql_query = errors_and_sql
-        responses = sql_query  # Default to the input SQL query after error check.
+        final_response = sql_query  # Default to the input SQL query after error check.
         if errors:
             print("Processing input errors")
             if schema_dict:
@@ -399,9 +408,9 @@ class SqlTranslator:
                 sql_query=sql_query,
                 schema_insert=schema_insert,
             )
-            requests: list[str] = [prompt for _ in range(number_of_candidates)]
-            responses: list[str] = self._model.call_parallel(
-                requests, parser_func=self._parse_response
+            prompt_requests: list[str] = [prompt for _ in range(number_of_candidates)]
+            responses: list[str | None] = self._model.call_parallel(
+                prompt_requests, parser_func=self._parse_response
             )
             if responses:
                 # We only use the first response. Therefore the `number_of_candidates`
@@ -409,11 +418,11 @@ class SqlTranslator:
                 # pylint: disable=g-bad-todo
                 # pylint: enable=g-bad-todo
                 # First, find the first non-None response.
-                responses = [r for r in responses if r is not None]
-                if responses:
+                valid_responses = [r for r in responses if r is not None]
+                if valid_responses:
                     # Then, return the first non-None response.
-                    responses = responses[0]
-        return responses
+                    final_response = valid_responses[0]
+        return final_response
 
     def translate(
         self,
@@ -451,9 +460,7 @@ class SqlTranslator:
             read=self.INPUT_DIALECT,
             write=self.OUTPUT_DIALECT,
             error_level=sqlglot.ErrorLevel.IMMEDIATE,
-        )[
-            0
-        ]  # Transpile returns a list of strings.
+        )[0]  # Transpile returns a list of strings.
         print("****** sql_query after transpile:", sql_query)
         if self._tool_output_errors:
             sql_query = self._fix_errors(

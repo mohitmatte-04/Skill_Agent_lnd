@@ -18,20 +18,24 @@ import functools
 import os
 import random
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, List, Optional
+from typing import Any, cast
 
 import dotenv
 import vertexai
 from google.cloud import aiplatform
-from vertexai.generative_models import (GenerationConfig, HarmBlockThreshold,
-                                        HarmCategory)
+from vertexai.generative_models import (
+    GenerationConfig,
+    HarmBlockThreshold,
+    HarmCategory,
+)
 from vertexai.preview import caching
 from vertexai.preview.generative_models import GenerativeModel
 
 dotenv.load_dotenv(override=True)
 
-SAFETY_FILTER_CONFIG = {
+SAFETY_FILTER_CONFIG: Any = {
     HarmCategory.HARM_CATEGORY_UNSPECIFIED: HarmBlockThreshold.BLOCK_NONE,
     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
     HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -80,22 +84,24 @@ aiplatform.init(
 vertexai.init(project=GCP_PROJECT, location=GCP_LOCATION)
 
 
-def retry(max_attempts=8, base_delay=1, backoff_factor=2):
+def retry[F: Callable[..., Any]](
+    max_attempts: int = 8, base_delay: float = 1.0, backoff_factor: float = 2.0
+) -> Callable[[F], F]:
     """Decorator to add retry logic to a function.
 
     Args:
         max_attempts (int): The maximum number of attempts.
-        base_delay (int): The base delay in seconds for the exponential backoff.
-        backoff_factor (int): The factor by which to multiply the delay for each
+        base_delay (float): The base delay in seconds for the exponential backoff.
+        backoff_factor (float): The factor by which to multiply the delay for each
           subsequent attempt.
 
     Returns:
         Callable: The decorator function.
     """
 
-    def decorator(func):
+    def decorator(func: F) -> F:
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             attempts = 0
             while attempts < max_attempts:
                 try:
@@ -109,7 +115,7 @@ def retry(max_attempts=8, base_delay=1, backoff_factor=2):
                     delay = delay + random.uniform(0, 0.1 * delay)
                     time.sleep(delay)
 
-        return wrapper
+        return cast(F, wrapper)
 
     return decorator
 
@@ -124,7 +130,7 @@ class GeminiModel:
         distribute_requests: bool = False,
         cache_name: str | None = None,
         temperature: float = 0.01,
-        **kwargs,
+        **kwargs: Any,
     ):
         self.model_name = model_name
         self.finetuned_model = finetuned_model
@@ -148,7 +154,7 @@ class GeminiModel:
             self.model = GenerativeModel(model_name=model_name)
 
     @retry(max_attempts=12, base_delay=2, backoff_factor=2)
-    def call(self, prompt: str, parser_func=None) -> str:
+    def call(self, prompt: str, parser_func: Callable[[str], Any] | None = None) -> str:
         """Calls the Gemini model with the given prompt.
 
         Args:
@@ -169,16 +175,16 @@ class GeminiModel:
             safety_settings=SAFETY_FILTER_CONFIG,
         ).text
         if parser_func:
-            return parser_func(response)
-        return response
+            return str(parser_func(response))
+        return str(response)
 
     def call_parallel(
         self,
-        prompts: List[str],
-        parser_func: Optional[Callable[[str], str]] = None,
+        prompts: list[str],
+        parser_func: Callable[[str], str] | None = None,
         timeout: int = 60,
         max_retries: int = 5,
-    ) -> List[Optional[str]]:
+    ) -> list[str | None]:
         """Calls the Gemini model for multiple prompts in parallel using threads with retry logic.
 
         Args:
@@ -191,9 +197,9 @@ class GeminiModel:
             List[Optional[str]]:
             A list of responses, or None for threads that failed.
         """
-        results = [None] * len(prompts)
+        results: list[str | None] = [None] * len(prompts)
 
-        def worker(index: int, prompt: str):
+        def worker(index: int, prompt: str) -> str | None:
             """Thread worker function to call the model and store the result with retries."""
             retries = 0
             while retries <= max_retries:
@@ -207,6 +213,7 @@ class GeminiModel:
                         time.sleep(1)  # Small delay before retrying
                     else:
                         return f"Error after retries: {str(e)}"
+            return None
 
         # Create and start one thread for each prompt
         with ThreadPoolExecutor(max_workers=len(prompts)) as executor:

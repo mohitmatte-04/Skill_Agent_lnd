@@ -121,7 +121,9 @@ def setup_opentelemetry(
         credentials, _ = google.auth.default()
     except DefaultCredentialsError as e:
         print(f"⚠️ [observability] ADC not found: {e}")
-        print("💻 Telemetry will be disabled. To enable, run 'gcloud auth application-default login'")
+        print(
+            "💻 Telemetry will be disabled. To enable, run 'gcloud auth application-default login'"
+        )
         # Return early to skip telemetry setup
         return
     except Exception as e:

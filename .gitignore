@@ -212,3 +212,4 @@ __marimo__/
 
 # Ephemeral github actions creds
 gha-creds-*.json
+\n# Udemy Secrets\nudemy/config.json
