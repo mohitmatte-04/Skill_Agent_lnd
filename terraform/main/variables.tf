@@ -69,3 +69,27 @@ variable "adk_suppress_experimental_feature_warnings" {
   nullable    = true
   default     = null
 }
+
+# Udemy API Configuration
+variable "udemy_account_id" {
+  description = "Udemy Business Account ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "udemy_subdomain" {
+  description = "Udemy Business Subdomain"
+  type        = string
+}
+
+variable "udemy_client_id" {
+  description = "Udemy API Client ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "udemy_client_secret" {
+  description = "Udemy API Client Secret"
+  type        = string
+  sensitive   = true
+}
