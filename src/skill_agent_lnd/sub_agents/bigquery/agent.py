@@ -31,6 +31,7 @@ from . import tools
 # Try to import chase_db_tools, but don't fail if dependencies are missing
 try:
     from .chase_sql import chase_db_tools
+
     CHASE_DB_TOOLS_AVAILABLE = True
 except ImportError as e:
     logging.warning(f"chase_db_tools not available: {e}")
@@ -52,9 +53,7 @@ def setup_before_agent_call(callback_context: CallbackContext) -> None:
     """Setup the agent."""
 
     if "database_settings" not in callback_context.state:
-        callback_context.state["database_settings"] = (
-            tools.get_database_settings()
-        )
+        callback_context.state["database_settings"] = tools.get_database_settings()
 
 
 def store_results_in_context(
@@ -63,7 +62,6 @@ def store_results_in_context(
     tool_context: ToolContext,
     tool_response: dict,
 ) -> dict | None:
-
     # We are setting a state for the data science agent to be able to use the
     # sql query results as context
     if (

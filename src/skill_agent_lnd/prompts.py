@@ -6,7 +6,6 @@ These instructions guide the agent's behavior, workflow, and tool usage.
 
 
 def return_instructions_root() -> str:
-
     instruction_prompt_root = """
     You are the **Skill Gap Analysis Agent**, a specialized Learning & Development consultant.
     Your **SOLE GOAL** is to help employees identify professional skill gaps and recommend Udemy learning paths.

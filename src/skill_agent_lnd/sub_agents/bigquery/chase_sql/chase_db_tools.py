@@ -43,6 +43,7 @@ class GenerateSQLType(enum.Enum):
     DC = "dc"
     QP = "qp"
 
+
 def exception_wrapper[F: Callable[..., Any]](func: F) -> F:
     """A decorator to catch exceptions in a function and return the exception as a string.
 
@@ -114,9 +115,7 @@ def initial_bq_nl2sql(
     ]
     model_name = tool_context.state["database_settings"]["model"]
     temperature = tool_context.state["database_settings"]["temperature"]
-    generate_sql_type = tool_context.state["database_settings"][
-        "generate_sql_type"
-    ]
+    generate_sql_type = tool_context.state["database_settings"]["generate_sql_type"]
 
     if generate_sql_type == GenerateSQLType.DC.value:
         prompt = DC_PROMPT_TEMPLATE.format(

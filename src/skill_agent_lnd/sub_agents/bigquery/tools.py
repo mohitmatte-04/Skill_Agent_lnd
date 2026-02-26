@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 # Try to import chase_sql, but don't fail if it's not available
 try:
     from .chase_sql import chase_constants
+
     CHASE_SQL_AVAILABLE = True
 except ImportError:
     logger.warning("chase_sql module not available - CHASE NL2SQL method will not work")

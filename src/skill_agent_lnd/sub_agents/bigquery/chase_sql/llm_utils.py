@@ -83,6 +83,7 @@ aiplatform.init(
 )
 vertexai.init(project=GCP_PROJECT, location=GCP_LOCATION)
 
+
 def retry[F: Callable[..., Any]](
     max_attempts: int = 8, base_delay: float = 1.0, backoff_factor: float = 2.0
 ) -> Callable[[F], F]:

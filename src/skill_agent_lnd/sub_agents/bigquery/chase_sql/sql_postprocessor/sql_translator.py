@@ -53,17 +53,20 @@ def _isinstance_ddl_schema_type(obj: Any) -> bool:
         isinstance(obj, list)
         and all(
             # Every element is a tuple or list.
-            isinstance(v, (tuple, list)) for v in obj
+            isinstance(v, (tuple, list))
+            for v in obj
         )
         and all(
             # First element is a string (table name) and
             # second element is a list (of tuples or lists).
-            isinstance(v[0], str) and isinstance(v[1], list) for v in obj
+            isinstance(v[0], str) and isinstance(v[1], list)
+            for v in obj
         )
         and all(
             # Every element of above list is a tuple or list of strings
             # (column name, column type)
-            _isinstance_list_of_str_tuples_lists(v[1]) for v in obj
+            _isinstance_list_of_str_tuples_lists(v[1])
+            for v in obj
         )
     )
     # pylint: enable=g-complex-comprehension
@@ -234,7 +237,10 @@ class SqlTranslator:
         column_names = sample["db_column_names"]["column_name"][1:]
         column_types = sample["db_column_types"][1:]
         column_types = [col_types_map[col_type] for col_type in column_types]
-        assert len(column_names) == len(column_types)
+        if len(column_names) != len(column_types):
+            raise ValueError(
+                f"Column names and types length mismatch: {len(column_names)} != {len(column_types)}"
+            )
         cols_and_types: list[tuple[str, str]] = list(
             zip(column_names, column_types, strict=True)
         )
@@ -290,7 +296,9 @@ class SqlTranslator:
             elif _isinstance_sqlglot_schema_type(schema):
                 schema_dict = cast(SQLGlotSchemaType, schema)
             elif _isinstance_bird_sample_type(schema):
-                schema_dict = cls._get_schema_from_bird_sample(cast(BirdSampleType, schema))
+                schema_dict = cls._get_schema_from_bird_sample(
+                    cast(BirdSampleType, schema)
+                )
             elif _isinstance_ddl_schema_type(schema):
                 schema_dict = cls.format_schema(cast(DDLSchemaType, schema))
             else:
@@ -452,9 +460,7 @@ class SqlTranslator:
             read=self.INPUT_DIALECT,
             write=self.OUTPUT_DIALECT,
             error_level=sqlglot.ErrorLevel.IMMEDIATE,
-        )[
-            0
-        ]  # Transpile returns a list of strings.
+        )[0]  # Transpile returns a list of strings.
         print("****** sql_query after transpile:", sql_query)
         if self._tool_output_errors:
             sql_query = self._fix_errors(

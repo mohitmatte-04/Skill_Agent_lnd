@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 _agent_dir = Path(__file__).parent
 
+
 def load_config() -> None:
     yaml_file = _agent_dir / "agent_settings.yaml"
 
@@ -34,6 +35,7 @@ def load_config() -> None:
                 logger.info(f"✅ Loaded YAML config from {yaml_file}")
         except Exception as e:
             logger.error(f"❌ Failed to load YAML config from {yaml_file}: {e}")
+
 
 load_config()
 

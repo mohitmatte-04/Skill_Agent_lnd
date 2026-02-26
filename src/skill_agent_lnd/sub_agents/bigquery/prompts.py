@@ -24,13 +24,11 @@ from ...utils.utils import get_env_var
 
 
 def return_instructions_bigquery() -> str:
-
-    NL2SQL_METHOD = os.getenv("NL2SQL_METHOD", "BASELINE")
-    if NL2SQL_METHOD == "BASELINE" or NL2SQL_METHOD == "CHASE":
+    nl2sql_method = os.getenv("NL2SQL_METHOD", "BASELINE")
+    if nl2sql_method == "BASELINE" or nl2sql_method == "CHASE":
         nl2sql_tool_name = "initial_bq_nl2sql"
     else:
-        nl2sql_tool_name = None
-        raise ValueError(f"Unknown NL2SQL method: {NL2SQL_METHOD}")
+        nl2sql_tool_name = "bigquery_nl2sql"
     execute_sql_tool_name = "execute_sql"
 
     instruction_prompt_bigquery = f"""

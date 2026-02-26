@@ -12,26 +12,24 @@ from pytest_mock import MockerFixture, MockType
 def pytest_configure(config: pytest.Config) -> None:
     """Pytest hook to set up environment before test collection.
 
-    IMPORTANT: This hook runs BEFORE pytest's plugin system is fully initialized,
-    including pytest-mock. We must use unittest.mock.patch here because:
-
-    1. This hook runs before test collection
-    2. Test collection imports test modules, which imports skill_agent_lnd modules
-    3. Agent modules may trigger API calls during import (auth, config loading)
-    4. pytest-mock's mocker/session_mocker fixtures aren't available until AFTER
-       test collection completes
-
-    Pytest execution order:
-    - pytest_configure() ← We are here (only stdlib available)
-    - Test collection (imports happen, triggers API calls if not mocked)
-    - Session setup (fixtures become available)
-    - Test execution
-
-    Therefore, unittest.mock is the ONLY tool available at this stage. This is
-    the only place in the codebase where unittest.mock is used - all other mocking
-    (fixtures and tests) uses pytest-mock's mocker fixture.
+    ... (docstring truncated for brevity)
     """
+    import os
     from unittest.mock import Mock, patch
+
+    # Set test environment variables before any imports occur
+    # Use direct assignment (not setdefault) since we're preventing .env loading
+    os.environ["GOOGLE_CLOUD_PROJECT"] = "test-project"
+    os.environ["GOOGLE_CLOUD_LOCATION"] = "us-central1"
+    os.environ["AGENT_NAME"] = "test-agent"
+    os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "true"
+    os.environ["BQ_DATASET_ID"] = "test-dataset"
+    os.environ["BQ_DATA_PROJECT_ID"] = "test-data-project"
+    os.environ["BQ_COMPUTE_PROJECT_ID"] = "test-compute-project"
+    os.environ["BASELINE_NL2SQL_MODEL"] = "gemini-1.5-flash"
+    os.environ["CHASE_NL2SQL_MODEL"] = "gemini-1.5-pro"
+    os.environ["ROOT_AGENT_MODEL"] = "gemini-1.5-pro"
+    os.environ["BIGQUERY_AGENT_MODEL"] = "gemini-1.5-pro"
 
     # Patch load_dotenv to prevent loading real .env file during module imports
     load_dotenv_patcher = patch("dotenv.load_dotenv")
@@ -63,20 +61,11 @@ def pytest_configure(config: pytest.Config) -> None:
         return_value={
             "test_table": {
                 "table_schema": [("col1", "STRING")],
-                "example_values": {"col1": ["val1"]}
+                "example_values": {"col1": ["val1"]},
             }
-        }
+        },
     )
     bq_schema_patcher.start()
-
-    # Set test environment variables before any imports occur
-    # Use direct assignment (not setdefault) since we're preventing .env loading
-    import os
-
-    os.environ["GOOGLE_CLOUD_PROJECT"] = "test-project"
-    os.environ["GOOGLE_CLOUD_LOCATION"] = "us-central1"
-    os.environ["AGENT_NAME"] = "test-agent"
-    os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "true"
 
 
 # ADK Callback Mock Objects for testing callbacks

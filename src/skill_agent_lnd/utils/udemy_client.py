@@ -4,11 +4,14 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
+
 
 def load_config() -> dict[str, Any]:
     """Load configuration from environment variables or fallback to JSON file."""
@@ -45,6 +48,7 @@ def load_config() -> dict[str, Any]:
 
     return {}
 
+
 # Initialize credentials
 _config = load_config()
 ACCOUNT_ID = _config.get("account_id")
@@ -54,12 +58,14 @@ CLIENT_SECRET = _config.get("client_secret")
 
 SKILL_ALIAS_MAP = {
     "nextjs": "next.js",
-    "expressjs": "express", # 'express' with boundary check is safe
+    "expressjs": "express",  # 'express' with boundary check is safe
     "vuejs": "vue.js",
     "angularjs": "angular",
-    "node.js": "node", # normalize to simple 'node' if needed
+    "node.js": "node",  # normalize to simple 'node' if needed
     "nodejs": "node.js",
+    "mongodb": "mongodb",
 }
+
 
 def _match_skill(query: str, title: str) -> bool:
     """
@@ -69,7 +75,6 @@ def _match_skill(query: str, title: str) -> bool:
     t = title.lower()
 
     # 1. Check Aliases
-    # If the query is in our map, use the mapped version (e.g. nextjs -> next.js)
     search_term = SKILL_ALIAS_MAP.get(q_raw, q_raw)
 
     # SPECIAL EXCLUSION: If searching for "express", exclude "adobe" (Adobe Express)
@@ -78,30 +83,55 @@ def _match_skill(query: str, title: str) -> bool:
 
     # 2. Regex Match with Word Boundaries
     try:
-        # specific handling for dot escaping
         escaped_term = re.escape(search_term)
         pattern = r"\b" + escaped_term + r"\b"
         if re.search(pattern, t):
             return True
 
-        # Special Case: 'js' suffix removal for unmapped terms (fallback)
+        # Special Case: 'js' suffix removal
         if q_raw.endswith("js") and len(q_raw) > 2 and q_raw not in SKILL_ALIAS_MAP:
             base = q_raw[:-2]
             if len(base) > 2:
-                 pattern_base = r"\b" + re.escape(base) + r"\b"
-                 if re.search(pattern_base, t):
-                     return True
+                pattern_base = r"\b" + re.escape(base) + r"\b"
+                if re.search(pattern_base, t):
+                    return True
 
     except Exception:
-        # Fallback to simple substring
-        if search_term in t:
+        pass
+
+    # 3. Fallback: Check original query if different
+    if q_raw != search_term:
+        if q_raw in t:
             return True
+
+    # 4. Final Fallback: Simple substring match for search term
+    if search_term in t:
+        return True
 
     return False
 
-def fetch_single_course(skill_name: str, language: str = "en") -> dict[str, Any]:
+
+def _create_retry_session() -> requests.Session:
+    """Create a requests session with retry logic for 429/5xx errors."""
+    session = requests.Session()
+    retries = Retry(
+        total=5,
+        backoff_factor=1,  # wait 1s, 2s, 4s...
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"],
+    )
+    adapter = HTTPAdapter(max_retries=retries)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
+def fetch_courses_for_skills(skills: List[str], language: str = "en") -> Dict[str, Any]:
     """
-    Fetches the first matching course for a skill by iterating through pages.
+    Scans the Udemy organization catalog to find one matching course for each skill in the list.
+    
+    This uses a single-pass scan of the catalog (up to a limit) to find matches for all 
+    skills simultaneously, which is much more efficient than scanning for each skill individually.
     """
     if not all([ACCOUNT_ID, SUBDOMAIN, CLIENT_ID, CLIENT_SECRET]):
         return {}
@@ -119,87 +149,110 @@ def fetch_single_course(skill_name: str, language: str = "en") -> dict[str, Any]
         f"{ACCOUNT_ID}/courses/list/"
     )
 
+    # Track which skills we still need to find
+    remaining_skills = set(skills)
+    found_courses: Dict[str, Any] = {}
+    
+    session = _create_retry_session()
+    
     page = 1
+    # Limit scanning to 200 pages (~20,000 courses) to avoid infinite loops
+    # This aligns with the logic in final_udemy_coursefetcher.py but for multiple skills
+    MAX_PAGES = 200 
 
     try:
-        # Scan up to 200 pages (20,000 courses) - Fast scan
-        while page <= 200:
-            if page % 20 == 0: # Log less frequently
-                 logger.info(f"Scanning page {page} for '{skill_name}'...")
+        while page <= MAX_PAGES and remaining_skills:
+            if page % 10 == 0:
+                logger.info(f"Scanning page {page}... Remaining skills: {remaining_skills}")
 
-            params: dict[str, Any] = {
+            params = {
                 "page": page,
-                "page_size": 100, # Maximize page size for speed
+                "page_size": 100,  # Maximize page size for speed
                 "fields[course]": "id,title,url,headline,visible_instructors,locale",
             }
 
-            response = requests.get(url, headers=headers, params=params, timeout=10)
+            response = session.get(url, headers=headers, params=params, timeout=15)
+            
             if response.status_code != 200:
-                logger.warning(f"Udemy API returned {response.status_code}")
+                logger.warning(f"Udemy API returned {response.status_code} on page {page}")
                 break
 
             data = response.json()
             results = data.get("results", [])
+            
             if not results:
                 break
 
+            # Iterate through courses on this page
             for course in results:
                 title = course.get("title", "")
+                
+                # Check against all remaining skills
+                skills_found_in_this_course = set()
+                for skill in remaining_skills:
+                    if _match_skill(skill, title):
+                        # Language filter
+                        if language:
+                            course_locale = course.get("locale", {})
+                            if isinstance(course_locale, dict):
+                                course_lang = course_locale.get("locale", "")
+                            else:
+                                course_lang = ""
+                            
+                            if not course_lang.lower().startswith(language.lower()):
+                                continue
 
-                if _match_skill(skill_name, title):
-                    # Language filter
-                    if language:
-                        course_locale = course.get("locale", {})
-                        if isinstance(course_locale, dict):
-                            course_lang = course_locale.get("locale", "")
-                        else:
-                            course_lang = ""
+                        # Found a match!
+                        course_url = course.get("url", "")
+                        if not course_url.startswith("http"):
+                            course_url = f"https://{SUBDOMAIN}.udemy.com{course_url}"
 
-                        if not course_lang.lower().startswith(language.lower()):
-                            continue
+                        instructors = ", ".join(
+                            [i.get("title") for i in course.get("visible_instructors", [])]
+                        )
 
-                    course_url = course.get("url", "")
-                    if not course_url.startswith("http"):
-                        course_url = f"https://{SUBDOMAIN}.udemy.com{course_url}"
-
-                    instructors = ", ".join(
-                        [i.get("title") for i in course.get("visible_instructors", [])]
-                    )
-
-                    return {
-                        "title": course.get("title"),
-                        "url": course_url,
-                        "headline": course.get("headline"),
-                        "instructors": instructors
-                    }
+                        found_courses[skill] = {
+                            "title": course.get("title"),
+                            "url": course_url,
+                            "headline": course.get("headline"),
+                            "instructors": instructors,
+                        }
+                        skills_found_in_this_course.add(skill)
+                        logger.info(f"Found course for '{skill}': {title}")
+                
+                # Remove found skills from the search set
+                remaining_skills -= skills_found_in_this_course
+                if not remaining_skills:
+                    break
 
             if not data.get("next"):
                 break
+                
             page += 1
 
-        return {}
     except Exception as e:
-        logger.error(f"Error fetching course for {skill_name}: {e}")
-        return {}
+        logger.error(f"Error scanning Udemy catalog: {e}")
+
+    return found_courses
+
 
 def get_smart_recommendations(missing_skills: list[str]) -> dict[str, Any]:
     """
     Returns individual course recommendations for each missing skill.
     """
+    logger.info(f"Starting batched search for skills: {missing_skills}")
+    
+    # Use the single-pass scanner
+    found_courses_map = fetch_courses_for_skills(missing_skills)
+    
     recommendations: dict[str, Any] = {
         "comprehensive_courses": [],
-        "individual_courses": {}
+        "individual_courses": found_courses_map,
     }
-
+    
+    # Log what was not found
     for skill in missing_skills:
-        logger.info(f"Searching Udemy for skill: {skill}")
-        course = fetch_single_course(skill)
-        if course:
-            recommendations["individual_courses"][skill] = course
-        else:
+        if skill not in found_courses_map:
             logger.info(f"No course found for skill: {skill}")
-
-        # No sleep to match original script speed
-        # time.sleep(0.5)
 
     return recommendations
