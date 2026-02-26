@@ -38,6 +38,15 @@ on:
         required: false
         type: boolean
         default: false
+    secrets:
+      UDEMY_ACCOUNT_ID:
+        required: true
+      UDEMY_SUBDOMAIN:
+        required: true
+      UDEMY_CLIENT_ID:
+        required: true
+      UDEMY_CLIENT_SECRET:
+        required: true
 
 permissions:
   contents: read

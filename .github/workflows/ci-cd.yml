@@ -94,7 +94,11 @@ jobs:
       docker_image: ${{ needs.build.outputs.digest_uri }}
       terraform_action: plan
       save_plan: ${{ github.event_name == 'push' }}  # Save on merge, not PR
-    secrets: inherit
+    secrets:
+      UDEMY_ACCOUNT_ID: ${{ secrets.UDEMY_ACCOUNT_ID }}
+      UDEMY_SUBDOMAIN: ${{ secrets.UDEMY_SUBDOMAIN }}
+      UDEMY_CLIENT_ID: ${{ secrets.UDEMY_CLIENT_ID }}
+      UDEMY_CLIENT_SECRET: ${{ secrets.UDEMY_CLIENT_SECRET }}
 
   dev-apply:
     name: Apply Dev
@@ -107,7 +111,11 @@ jobs:
       docker_image: ${{ needs.build.outputs.digest_uri }}
       terraform_action: apply
       use_saved_plan: ${{ github.event_name == 'push' }}  # Matches the dev-plan job's save_plan pattern
-    secrets: inherit
+    secrets:
+      UDEMY_ACCOUNT_ID: ${{ secrets.UDEMY_ACCOUNT_ID }}
+      UDEMY_SUBDOMAIN: ${{ secrets.UDEMY_SUBDOMAIN }}
+      UDEMY_CLIENT_ID: ${{ secrets.UDEMY_CLIENT_ID }}
+      UDEMY_CLIENT_SECRET: ${{ secrets.UDEMY_CLIENT_SECRET }}
 
   # Stage environment (merge to main only, not PRs or tags, wait for dev to deploy)
   stage-promote:
@@ -132,7 +140,11 @@ jobs:
       docker_image: ${{ needs.stage-promote.outputs.digest_uri }}
       terraform_action: plan
       save_plan: true
-    secrets: inherit
+    secrets:
+      UDEMY_ACCOUNT_ID: ${{ secrets.UDEMY_ACCOUNT_ID }}
+      UDEMY_SUBDOMAIN: ${{ secrets.UDEMY_SUBDOMAIN }}
+      UDEMY_CLIENT_ID: ${{ secrets.UDEMY_CLIENT_ID }}
+      UDEMY_CLIENT_SECRET: ${{ secrets.UDEMY_CLIENT_SECRET }}
 
   stage-apply:
     name: Apply Stage
@@ -144,7 +156,11 @@ jobs:
       docker_image: ${{ needs.stage-promote.outputs.digest_uri }}
       terraform_action: apply
       use_saved_plan: true
-    secrets: inherit
+    secrets:
+      UDEMY_ACCOUNT_ID: ${{ secrets.UDEMY_ACCOUNT_ID }}
+      UDEMY_SUBDOMAIN: ${{ secrets.UDEMY_SUBDOMAIN }}
+      UDEMY_CLIENT_ID: ${{ secrets.UDEMY_CLIENT_ID }}
+      UDEMY_CLIENT_SECRET: ${{ secrets.UDEMY_CLIENT_SECRET }}
 
   # Production environment (tag events only)
   prod-promote:
@@ -170,7 +186,11 @@ jobs:
       docker_image: ${{ needs.prod-promote.outputs.digest_uri }}
       terraform_action: plan
       save_plan: true
-    secrets: inherit
+    secrets:
+      UDEMY_ACCOUNT_ID: ${{ secrets.UDEMY_ACCOUNT_ID }}
+      UDEMY_SUBDOMAIN: ${{ secrets.UDEMY_SUBDOMAIN }}
+      UDEMY_CLIENT_ID: ${{ secrets.UDEMY_CLIENT_ID }}
+      UDEMY_CLIENT_SECRET: ${{ secrets.UDEMY_CLIENT_SECRET }}
 
   prod-apply:
     name: Apply Prod
@@ -183,4 +203,8 @@ jobs:
       docker_image: ${{ needs.prod-promote.outputs.digest_uri }}
       terraform_action: apply
       use_saved_plan: true
-    secrets: inherit
+    secrets:
+      UDEMY_ACCOUNT_ID: ${{ secrets.UDEMY_ACCOUNT_ID }}
+      UDEMY_SUBDOMAIN: ${{ secrets.UDEMY_SUBDOMAIN }}
+      UDEMY_CLIENT_ID: ${{ secrets.UDEMY_CLIENT_ID }}
+      UDEMY_CLIENT_SECRET: ${{ secrets.UDEMY_CLIENT_SECRET }}
