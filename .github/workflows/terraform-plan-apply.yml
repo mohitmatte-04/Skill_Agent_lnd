@@ -91,6 +91,12 @@ jobs:
       TF_VAR_root_agent_model: ${{ vars.ROOT_AGENT_MODEL }}
       TF_VAR_serve_web_interface: ${{ vars.SERVE_WEB_INTERFACE }}
 
+      # Udemy Secrets
+      TF_VAR_udemy_account_id: ${{ secrets.UDEMY_ACCOUNT_ID }}
+      TF_VAR_udemy_subdomain: ${{ secrets.UDEMY_SUBDOMAIN }}
+      TF_VAR_udemy_client_id: ${{ secrets.UDEMY_CLIENT_ID }}
+      TF_VAR_udemy_client_secret: ${{ secrets.UDEMY_CLIENT_SECRET }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5

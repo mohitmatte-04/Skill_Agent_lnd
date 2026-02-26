@@ -39,6 +39,10 @@ locals {
     ROOT_AGENT_MODEL                                   = coalesce(var.root_agent_model, "gemini-2.5-flash")
     SERVE_WEB_INTERFACE                                = coalesce(var.serve_web_interface, "FALSE")
     TELEMETRY_NAMESPACE                                = var.environment
+    UDEMY_ACCOUNT_ID                                   = var.udemy_account_id
+    UDEMY_SUBDOMAIN                                    = var.udemy_subdomain
+    UDEMY_CLIENT_ID                                    = var.udemy_client_id
+    UDEMY_CLIENT_SECRET                                = var.udemy_client_secret
   }
 
   # Create a unique Agent resource name per deployment environment
