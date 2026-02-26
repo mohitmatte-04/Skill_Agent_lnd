@@ -16,15 +16,16 @@
 
 import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
-from ...utils.utils import get_env_var, USER_AGENT
 from google.adk.agents import LlmAgent
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.tools import BaseTool, ToolContext
 from google.adk.tools.bigquery import BigQueryToolset
 from google.adk.tools.bigquery.config import BigQueryToolConfig, WriteMode
 from google.genai import types
+
+from ...utils.utils import USER_AGENT
 from . import tools
 
 # Try to import chase_db_tools, but don't fail if dependencies are missing
@@ -34,7 +35,7 @@ try:
 except ImportError as e:
     logging.warning(f"chase_db_tools not available: {e}")
     CHASE_DB_TOOLS_AVAILABLE = False
-    chase_db_tools = None
+    chase_db_tools = None  # type: ignore
 
 from .prompts import return_instructions_bigquery
 
@@ -58,16 +59,18 @@ def setup_before_agent_call(callback_context: CallbackContext) -> None:
 
 def store_results_in_context(
     tool: BaseTool,
-    args: Dict[str, Any],
+    args: dict[str, Any],
     tool_context: ToolContext,
-    tool_response: Dict,
-) -> Optional[Dict]:
+    tool_response: dict,
+) -> dict | None:
 
     # We are setting a state for the data science agent to be able to use the
     # sql query results as context
-    if tool.name == ADK_BUILTIN_BQ_EXECUTE_SQL_TOOL:
-        if tool_response["status"] == "SUCCESS":
-            tool_context.state["bigquery_query_result"] = tool_response["rows"]
+    if (
+        tool.name == ADK_BUILTIN_BQ_EXECUTE_SQL_TOOL
+        and tool_response["status"] == "SUCCESS"
+    ):
+        tool_context.state["bigquery_query_result"] = tool_response["rows"]
 
     return None
 

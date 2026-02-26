@@ -27,10 +27,10 @@ print(env_file_path)
 load_dotenv(dotenv_path=env_file_path)
 
 
-def load_csv_to_bigquery(data_project_id,
-                         dataset_name,
-                         table_name,
-                         csv_filepath):
+def load_csv_to_bigquery(data_project_id: str,
+                         dataset_name: str,
+                         table_name: str,
+                         csv_filepath: str) -> None:
     """Loads a CSV file into a BigQuery table.
 
     Args:
@@ -51,7 +51,8 @@ def load_csv_to_bigquery(data_project_id,
         autodetect=True,  # Automatically detect the schema
     )
 
-    with open(csv_filepath, "rb") as source_file:
+    path = Path(csv_filepath)
+    with path.open("rb") as source_file:
         job = client.load_table_from_file(
             source_file, table_ref, job_config=job_config
         )
@@ -62,9 +63,9 @@ def load_csv_to_bigquery(data_project_id,
           f"{dataset_name}.{table_name}")
 
 
-def create_dataset_if_not_exists(compute_project_id,
-                                 data_project_id,
-                                 dataset_name):
+def create_dataset_if_not_exists(compute_project_id: str,
+                                 data_project_id: str,
+                                 dataset_name: str) -> None:
     """Creates a BigQuery dataset if it does not already exist.
 
     Args:
@@ -85,9 +86,9 @@ def create_dataset_if_not_exists(compute_project_id,
         print(f"Created dataset {dataset_full_name}")
 
 
-def main():
+def main() -> None:
 
-    current_directory = os.getcwd()
+    current_directory = Path.cwd()
     print(f"Current working directory: {current_directory}")
 
     """Main function to load CSV files into BigQuery."""

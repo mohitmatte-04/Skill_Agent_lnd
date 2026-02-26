@@ -15,7 +15,10 @@
 """This code contains the implementation of the tools used for the CHASE-SQL agent."""
 
 import enum
+import functools
 import os
+from collections.abc import Callable
+from typing import Any, cast
 
 from google.adk.tools import ToolContext
 
@@ -40,8 +43,7 @@ class GenerateSQLType(enum.Enum):
     DC = "dc"
     QP = "qp"
 
-
-def exception_wrapper(func):
+def exception_wrapper[F: Callable[..., Any]](func: F) -> F:
     """A decorator to catch exceptions in a function and return the exception as a string.
 
     Args:
@@ -51,13 +53,14 @@ def exception_wrapper(func):
        callable: The wrapped function.
     """
 
-    def wrapped_function(*args, **kwargs):
+    @functools.wraps(func)
+    def wrapped_function(*args: Any, **kwargs: Any) -> Any:
         try:
             return func(*args, **kwargs)
         except Exception as e:  # pylint: disable=broad-exception-caught
             return f"Exception occurred in {func.__name__}: {str(e)}"
 
-    return wrapped_function
+    return cast(F, wrapped_function)
 
 
 def parse_response(response: str) -> str:
@@ -109,7 +112,7 @@ def initial_bq_nl2sql(
     number_of_candidates = tool_context.state["database_settings"][
         "number_of_candidates"
     ]
-    model = tool_context.state["database_settings"]["model"]
+    model_name = tool_context.state["database_settings"]["model"]
     temperature = tool_context.state["database_settings"]["temperature"]
     generate_sql_type = tool_context.state["database_settings"][
         "generate_sql_type"
@@ -130,11 +133,11 @@ def initial_bq_nl2sql(
     else:
         raise ValueError(f"Unsupported generate_sql_type: {generate_sql_type}")
 
-    model = GeminiModel(model_name=model, temperature=temperature)
-    requests = [prompt for _ in range(number_of_candidates)]
-    responses = model.call_parallel(requests, parser_func=parse_response)
+    model = GeminiModel(model_name=model_name, temperature=temperature)
+    prompt_requests = [prompt for _ in range(number_of_candidates)]
+    llm_responses = model.call_parallel(prompt_requests, parser_func=parse_response)
     # Take just the first response.
-    responses = responses[0]
+    final_sql: str = llm_responses[0] if llm_responses and llm_responses[0] else ""
 
     # If postprocessing of the SQL to transpile it to BigQuery is required,
     # then do it here.
@@ -147,8 +150,8 @@ def initial_bq_nl2sql(
         )
         # pylint: disable=g-bad-todo
         # pylint: enable=g-bad-todo
-        responses: str = translator.translate(
-            responses, ddl_schema=bq_schema, db=db, catalog=project
+        final_sql = translator.translate(
+            final_sql, ddl_schema=bq_schema, db=db, catalog=project
         )
 
-    return responses
+    return final_sql

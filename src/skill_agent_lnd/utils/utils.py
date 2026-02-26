@@ -14,13 +14,15 @@
 
 import json
 import os
+from pathlib import Path
+from typing import Any
 
 from vertexai.preview.extensions import Extension
 
 USER_AGENT = "adk-samples-data-science-agent"
 
 
-def list_all_extensions():
+def list_all_extensions() -> None:
     extensions = Extension.list(location="us-central1")
     for extension in extensions:
         print("Name:", extension.gca_resource.name)
@@ -28,7 +30,7 @@ def list_all_extensions():
         print("Description:", extension.gca_resource.description)
 
 
-def get_env_var(var_name: str):
+def get_env_var(var_name: str) -> str:
     """Retrieves the value of an environment variable.
 
     Args:
@@ -48,7 +50,7 @@ def get_env_var(var_name: str):
         raise ValueError(f"Missing environment variable: {var_name}") from exc
 
 
-def get_image_bytes(filepath):
+def get_image_bytes(filepath: str) -> bytes | None:
     """Reads an image file and returns its bytes.
 
     Args:
@@ -59,7 +61,8 @@ def get_image_bytes(filepath):
       be read.
     """
     try:
-        with open(filepath, "rb") as f:  # "rb" mode for reading in binary
+        path = Path(filepath)
+        with path.open("rb") as f:  # "rb" mode for reading in binary
             image_bytes = f.read()
         return image_bytes
     except FileNotFoundError:
@@ -70,7 +73,7 @@ def get_image_bytes(filepath):
         return None
 
 
-def extract_json_from_model_output(model_output):
+def extract_json_from_model_output(model_output: str) -> dict[str, Any] | None:
     """Extracts JSON object from a string that potentially contains markdown
     code fences.
 
@@ -87,7 +90,9 @@ def extract_json_from_model_output(model_output):
             model_output.replace("```json", "").replace("```", "").strip()
         )
         json_object = json.loads(cleaned_output)
-        return json_object
+        if isinstance(json_object, dict):
+            return json_object
+        return None
     except json.JSONDecodeError as e:
         msg = f"Error decoding JSON: {e}"
         print(msg)

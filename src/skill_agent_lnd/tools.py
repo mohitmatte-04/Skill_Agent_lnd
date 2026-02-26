@@ -5,6 +5,7 @@ from typing import Any
 
 from google.adk.tools import ToolContext
 from google.adk.tools.agent_tool import AgentTool
+
 from .sub_agents.bigquery.agent import bigquery_agent
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,7 @@ async def search_udemy_courses(
     from .utils.udemy_client import get_smart_recommendations
 
     logger.info(f"Searching Udemy for missing skills: {missing_skills}")
-    
+
     try:
         recommendations = get_smart_recommendations(missing_skills)
         return recommendations

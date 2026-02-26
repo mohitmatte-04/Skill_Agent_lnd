@@ -56,6 +56,19 @@ def pytest_configure(config: pytest.Config) -> None:
     )
     auth_private_patcher.start()
 
+    # Patch BigQuery schema retrieval to prevent API calls during import
+    # This is critical because agent.py initializes DB settings at module level
+    bq_schema_patcher = patch(
+        "skill_agent_lnd.sub_agents.bigquery.tools.get_bigquery_schema_and_samples",
+        return_value={
+            "test_table": {
+                "table_schema": [("col1", "STRING")],
+                "example_values": {"col1": ["val1"]}
+            }
+        }
+    )
+    bq_schema_patcher.start()
+
     # Set test environment variables before any imports occur
     # Use direct assignment (not setdefault) since we're preventing .env loading
     import os
