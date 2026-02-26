@@ -75,21 +75,25 @@ variable "udemy_account_id" {
   description = "Udemy Business Account ID"
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "udemy_subdomain" {
   description = "Udemy Business Subdomain"
   type        = string
+  default     = ""
 }
 
 variable "udemy_client_id" {
   description = "Udemy API Client ID"
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "udemy_client_secret" {
   description = "Udemy API Client Secret"
   type        = string
   sensitive   = true
+  default     = ""
 }
