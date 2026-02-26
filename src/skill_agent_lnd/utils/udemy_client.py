@@ -4,7 +4,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -96,19 +96,15 @@ def _match_skill(query: str, title: str) -> bool:
                 if re.search(pattern_base, t):
                     return True
 
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"Exception in _match_skill: {e}")
 
     # 3. Fallback: Check original query if different
-    if q_raw != search_term:
-        if q_raw in t:
-            return True
-
-    # 4. Final Fallback: Simple substring match for search term
-    if search_term in t:
+    if q_raw != search_term and q_raw in t:
         return True
 
-    return False
+    # 4. Final Fallback: Simple substring match for search term
+    return search_term in t
 
 
 def _create_retry_session() -> requests.Session:
@@ -126,11 +122,11 @@ def _create_retry_session() -> requests.Session:
     return session
 
 
-def fetch_courses_for_skills(skills: List[str], language: str = "en") -> Dict[str, Any]:
+def fetch_courses_for_skills(skills: list[str], language: str = "en") -> dict[str, Any]:
     """
     Scans the Udemy organization catalog to find one matching course for each skill in the list.
-    
-    This uses a single-pass scan of the catalog (up to a limit) to find matches for all 
+
+    This uses a single-pass scan of the catalog (up to a limit) to find matches for all
     skills simultaneously, which is much more efficient than scanning for each skill individually.
     """
     if not all([ACCOUNT_ID, SUBDOMAIN, CLIENT_ID, CLIENT_SECRET]):
@@ -151,42 +147,46 @@ def fetch_courses_for_skills(skills: List[str], language: str = "en") -> Dict[st
 
     # Track which skills we still need to find
     remaining_skills = set(skills)
-    found_courses: Dict[str, Any] = {}
-    
+    found_courses: dict[str, Any] = {}
+
     session = _create_retry_session()
-    
+
     page = 1
     # Limit scanning to 200 pages (~20,000 courses) to avoid infinite loops
     # This aligns with the logic in final_udemy_coursefetcher.py but for multiple skills
-    MAX_PAGES = 200 
+    max_pages = 200
 
     try:
-        while page <= MAX_PAGES and remaining_skills:
+        while page <= max_pages and remaining_skills:
             if page % 10 == 0:
-                logger.info(f"Scanning page {page}... Remaining skills: {remaining_skills}")
+                logger.info(
+                    f"Scanning page {page}... Remaining skills: {remaining_skills}"
+                )
 
             params = {
-                "page": page,
-                "page_size": 100,  # Maximize page size for speed
+                "page": str(page),
+                "page_size": "100",  # Maximize page size for speed
                 "fields[course]": "id,title,url,headline,visible_instructors,locale",
             }
 
             response = session.get(url, headers=headers, params=params, timeout=15)
-            
+
             if response.status_code != 200:
-                logger.warning(f"Udemy API returned {response.status_code} on page {page}")
+                logger.warning(
+                    f"Udemy API returned {response.status_code} on page {page}"
+                )
                 break
 
             data = response.json()
             results = data.get("results", [])
-            
+
             if not results:
                 break
 
             # Iterate through courses on this page
             for course in results:
                 title = course.get("title", "")
-                
+
                 # Check against all remaining skills
                 skills_found_in_this_course = set()
                 for skill in remaining_skills:
@@ -198,7 +198,7 @@ def fetch_courses_for_skills(skills: List[str], language: str = "en") -> Dict[st
                                 course_lang = course_locale.get("locale", "")
                             else:
                                 course_lang = ""
-                            
+
                             if not course_lang.lower().startswith(language.lower()):
                                 continue
 
@@ -208,7 +208,10 @@ def fetch_courses_for_skills(skills: List[str], language: str = "en") -> Dict[st
                             course_url = f"https://{SUBDOMAIN}.udemy.com{course_url}"
 
                         instructors = ", ".join(
-                            [i.get("title") for i in course.get("visible_instructors", [])]
+                            [
+                                i.get("title")
+                                for i in course.get("visible_instructors", [])
+                            ]
                         )
 
                         found_courses[skill] = {
@@ -219,7 +222,7 @@ def fetch_courses_for_skills(skills: List[str], language: str = "en") -> Dict[st
                         }
                         skills_found_in_this_course.add(skill)
                         logger.info(f"Found course for '{skill}': {title}")
-                
+
                 # Remove found skills from the search set
                 remaining_skills -= skills_found_in_this_course
                 if not remaining_skills:
@@ -227,7 +230,7 @@ def fetch_courses_for_skills(skills: List[str], language: str = "en") -> Dict[st
 
             if not data.get("next"):
                 break
-                
+
             page += 1
 
     except Exception as e:
@@ -241,15 +244,15 @@ def get_smart_recommendations(missing_skills: list[str]) -> dict[str, Any]:
     Returns individual course recommendations for each missing skill.
     """
     logger.info(f"Starting batched search for skills: {missing_skills}")
-    
+
     # Use the single-pass scanner
     found_courses_map = fetch_courses_for_skills(missing_skills)
-    
+
     recommendations: dict[str, Any] = {
         "comprehensive_courses": [],
         "individual_courses": found_courses_map,
     }
-    
+
     # Log what was not found
     for skill in missing_skills:
         if skill not in found_courses_map:
