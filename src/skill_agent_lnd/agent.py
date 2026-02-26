@@ -43,7 +43,7 @@ from .prompts import return_instructions_root
 from .sub_agents.bigquery.tools import (
     get_database_settings as get_bq_database_settings,
 )
-from .tools import call_bigquery_agent
+from .tools import call_bigquery_agent, search_udemy_courses
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -152,6 +152,9 @@ def get_root_agent() -> LlmAgent:
     for dataset in _dataset_config["datasets"]:
         if dataset["type"] == "bigquery":
             tools.append(call_bigquery_agent)
+    
+    # Add Udemy search tool
+    tools.append(search_udemy_courses)
 
     agent = LlmAgent(
         model=os.getenv("ROOT_AGENT_MODEL", "gemini-2.5-flash"),
