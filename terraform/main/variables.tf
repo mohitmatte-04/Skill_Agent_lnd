@@ -74,7 +74,6 @@ variable "adk_suppress_experimental_feature_warnings" {
 variable "udemy_account_id" {
   description = "Udemy Business Account ID"
   type        = string
-  sensitive   = true
   default     = ""
 }
 
@@ -87,13 +86,11 @@ variable "udemy_subdomain" {
 variable "udemy_client_id" {
   description = "Udemy API Client ID"
   type        = string
-  sensitive   = true
   default     = ""
 }
 
 variable "udemy_client_secret" {
   description = "Udemy API Client Secret"
   type        = string
-  sensitive   = true
   default     = ""
 }
